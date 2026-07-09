@@ -1,0 +1,4 @@
+# credenciais NUNCA vão para o repositório (configurar em Settings > Secrets no Streamlit Cloud)
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
