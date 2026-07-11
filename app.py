@@ -437,7 +437,10 @@ with aba5:
 
             for r in rs:
                 # nome do profissional: fallback = nome do arquivo enviado
-                if not r.profissional.strip(" :.-"):
+                # (os parsers usam o nome do arquivo TEMPORÁRIO como último
+                # recurso — 'tmpXXXX' — que aqui trocamos pelo nome real)
+                if (not r.profissional.strip(" :.-")
+                        or r.profissional.lower().startswith("tmp")):
                     r.profissional = Path(up.name).stem.strip().title()
                     if not r.dados.empty:
                         r.dados["profissional"] = r.profissional
