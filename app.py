@@ -17,6 +17,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 from src.auth import barra_usuario, exigir_login
 from src.indicadores.motor import calcular_serie
+from src.relatorios.avaliacao_pdf import gerar_pdf_avaliacao
 from src.ingestao.parser_mapa_v2 import eh_template_v2, parse_arquivo_v2
 from src.ingestao.parser_ods import parse_arquivo
 
@@ -335,6 +336,20 @@ with aba_av:
                    "isso. Percentil calculado sobre a média de cada "
                    "profissional no período.")
 
+        # estruturas para o relatório PDF
+        tabela_pdf = [{
+            "Indicador": l["Indicador"], "valor": str(l[prof_av]),
+            "media": str(l["Média rede"]), "dp": str(l["DP"]),
+            "mediana": str(l["Mediana"]), "iiq": l["IIQ (P25–P75)"],
+            "percentil": l["Percentil"],
+            "situacao": l["Situação"].split(" ", 1)[1],
+        } for l in linhas_av]
+        ordenado = sorted(percentis_radar.items(), key=lambda x: x[1])
+        fortes_txt = [f"{INDICADORES_ROTULOS[k]} — percentil ajustado {v:.0f}"
+                      for k, v in reversed(ordenado[-3:])]
+        fracos_txt = [f"{INDICADORES_ROTULOS[k]} — percentil ajustado {v:.0f}"
+                      for k, v in ordenado[:3] if v < 50]
+
         col_radar, col_destaques = st.columns([1, 1])
 
         # ---------- radar de posição relativa ----------
@@ -364,20 +379,17 @@ with aba_av:
         # ---------- destaques automáticos ----------
         with col_destaques:
             st.markdown("##### Destaques do período")
-            ordenado = sorted(percentis_radar.items(), key=lambda x: x[1])
-            for k, v in reversed(ordenado[-3:]):
-                st.success(f"**{INDICADORES_ROTULOS[k]}** — percentil "
-                           f"ajustado {v:.0f} (ponto forte)")
-            for k, v in ordenado[:3]:
-                if v < 50:
-                    st.error(f"**{INDICADORES_ROTULOS[k]}** — percentil "
-                             f"ajustado {v:.0f} (oportunidade de melhoria)")
+            for t in fortes_txt:
+                st.success(f"**{t}** (ponto forte)")
+            for t in fracos_txt:
+                st.error(f"**{t}** (oportunidade de melhoria)")
             st.caption("Percentil ajustado: 100 = melhor posição da rede, "
                        "já considerando a direção de cada indicador.")
 
         # ---------- evolução mensal com banda da rede ----------
         st.markdown("##### Evolução mensal × rede "
                     + ("(média ± 1 DP)" if usa_media else "(mediana + IIQ)"))
+        series_pdf = []
         colunas_graf = st.columns(2)
         for i, k in enumerate(inds_sel):
             stats = (base_cmp.groupby("competencia")[k]
@@ -413,6 +425,50 @@ with aba_av:
                 legend=dict(orientation="h", y=-0.3),
                 xaxis=dict(tickvals=list(stats.index)[::max(1, len(stats)//8)]))
             colunas_graf[i % 2].plotly_chart(fig, use_container_width=True)
+
+            series_pdf.append({
+                "titulo": INDICADORES_ROTULOS[k],
+                "labels": [fmt_comp(c) for c in stats.index],
+                "centro": centro.tolist(),
+                "sup": sup.tolist(),
+                "inf": inf.tolist(),
+                "prof_x": [fmt_comp(c) for c in g["competencia"]],
+                "prof_y": g[k].tolist(),
+                "menor_melhor": k in MENOR_MELHOR,
+            })
+
+        # ---------- relatório em PDF ----------
+        st.divider()
+        params_pdf = (prof_av, ini, fim, tuple(inds_sel), medida,
+                      tuple(sorted(funcoes)))
+        col_b1, col_b2 = st.columns([1, 2])
+        if col_b1.button("🖨️ Gerar relatório PDF", key="av_pdf_btn",
+                         type="primary"):
+            with st.spinner("Montando o relatório..."):
+                pdf_bytes = gerar_pdf_avaliacao(
+                    profissional=prof_av,
+                    funcao=str(info["funcao"]),
+                    unidade=str(info["unidade"]),
+                    periodo_txt=f"{fmt_comp(ini)} a {fmt_comp(fim)}",
+                    n_profs=n_profs,
+                    n_competencias=int(g["competencia"].nunique()),
+                    tabela_linhas=tabela_pdf,
+                    percentis={INDICADORES_ROTULOS[k]: v
+                               for k, v in percentis_radar.items()},
+                    fortes=fortes_txt, fracos=fracos_txt,
+                    series=series_pdf,
+                    referencia_txt=("média ± 1 DP" if usa_media
+                                    else "mediana + IIQ"),
+                )
+            st.session_state["av_pdf"] = (params_pdf, pdf_bytes)
+        if (st.session_state.get("av_pdf")
+                and st.session_state["av_pdf"][0] == params_pdf):
+            col_b2.download_button(
+                "⬇️ Baixar relatório (PDF)",
+                st.session_state["av_pdf"][1],
+                file_name=(f"avaliacao_{prof_av.replace(' ', '_')}"
+                           f"_{ini}_a_{fim}.pdf"),
+                mime="application/pdf", key="av_pdf_dl")
 
 # ======================================================================
 # ABA 3 — COMPARATIVO
