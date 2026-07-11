@@ -1,5 +1,8 @@
-streamlit==1.37.1
-pandas==2.2.2
-plotly==5.24.1
-pyarrow==16.1.0
-numpy==1.26.4
+# Pinado para Python 3.14 (ambiente do Streamlit Community Cloud).
+# pandas 2.3.x (maduro) no lugar do 3.0.x e pyarrow 22 no lugar do 25,
+# que causavam Segmentation fault na carga dos dados (log de 11/07/2026).
+streamlit==1.59.1
+pandas==2.3.3
+numpy==2.5.1
+pyarrow==22.0.0
+plotly==6.9.0
