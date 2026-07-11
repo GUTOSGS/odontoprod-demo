@@ -350,16 +350,20 @@ with aba5:
     st.dataframe(f.sort_values(["competencia", "profissional"]),
                  use_container_width=True, height=420)
 
+    @st.cache_data(max_entries=3, show_spinner=False)
+    def _csv_bytes(df_hashavel: pd.DataFrame) -> bytes:
+        return df_hashavel.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
     c1, c2 = st.columns(2)
     c1.download_button(
         "⬇️ Baixar indicadores filtrados (CSV)",
-        f.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        _csv_bytes(f),
         file_name=f"indicadores_{ini}_a_{fim}.csv",
         mime="text/csv",
     )
     c2.download_button(
         "⬇️ Baixar lançamentos brutos filtrados (CSV)",
-        fp.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        _csv_bytes(fp),
         file_name=f"producao_{ini}_a_{fim}.csv",
         mime="text/csv",
     )
