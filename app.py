@@ -16,6 +16,9 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 from src.auth import barra_usuario, exigir_login
+from src.indicadores.motor import calcular_serie
+from src.ingestao.parser_mapa_v2 import eh_template_v2, parse_arquivo_v2
+from src.ingestao.parser_ods import parse_arquivo
 
 DADOS = Path(__file__).parent / "dados"
 
@@ -61,17 +64,35 @@ def carregar():
 ind, prod = carregar()
 competencias = sorted(ind["competencia"].unique())
 
+MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun",
+               "jul", "ago", "set", "out", "nov", "dez"]
+
+
+def fmt_comp(c: str) -> str:
+    ano, mes = c.split("-")
+    return f"{MESES_ABREV[int(mes) - 1]}/{ano}"
+
+
 # ----------------------------------------------------------------------
 # Barra lateral: filtros globais
 # ----------------------------------------------------------------------
 st.sidebar.title("🦷 OdontoProd")
 st.sidebar.caption("Demonstração pública — **dados anonimizados** · TCC MBA DSA USP/Esalq")
 
-ini, fim = st.sidebar.select_slider(
-    "Período (competência)",
-    options=competencias,
-    value=(competencias[0], competencias[-1]),
-)
+modo_periodo = st.sidebar.radio("Período", ["Intervalo", "Mês único"],
+                                horizontal=True, label_visibility="collapsed")
+if modo_periodo == "Mês único":
+    comp_unica = st.sidebar.selectbox("Competência", competencias,
+                                      index=len(competencias) - 1,
+                                      format_func=fmt_comp)
+    ini = fim = comp_unica
+else:
+    col_de, col_ate = st.sidebar.columns(2)
+    ini = col_de.selectbox("De", competencias, index=0, format_func=fmt_comp)
+    fim = col_ate.selectbox("Até", competencias,
+                            index=len(competencias) - 1, format_func=fmt_comp)
+    if ini > fim:
+        ini, fim = fim, ini
 
 funcoes = st.sidebar.multiselect(
     "Função", ["dentista", "tecnico"], default=["dentista"],
@@ -100,6 +121,13 @@ st.sidebar.caption(
     f"**{int(f['total_procedimentos'].sum()):,}** procedimentos".replace(",", ".")
 )
 barra_usuario()
+
+if f.empty:
+    st.warning("⚠️ Nenhum registro para a combinação de filtros selecionada. "
+               "Verifique o período, a função (CD/técnico) e os profissionais "
+               "escolhidos — por exemplo, um dentista não aparece quando o "
+               "filtro de função está em 'Técnico', e vice-versa.")
+    st.stop()
 
 # ----------------------------------------------------------------------
 titulo_abas = ["📊 Visão Geral", "👤 Produtividade Individual",
@@ -350,28 +378,116 @@ with aba5:
     st.dataframe(f.sort_values(["competencia", "profissional"]),
                  use_container_width=True, height=420)
 
-    @st.cache_data(max_entries=3, show_spinner=False)
-    def _csv_bytes(df_hashavel: pd.DataFrame) -> bytes:
-        return df_hashavel.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
     c1, c2 = st.columns(2)
     c1.download_button(
         "⬇️ Baixar indicadores filtrados (CSV)",
-        _csv_bytes(f),
+        f.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
         file_name=f"indicadores_{ini}_a_{fim}.csv",
         mime="text/csv",
     )
     c2.download_button(
         "⬇️ Baixar lançamentos brutos filtrados (CSV)",
-        _csv_bytes(fp),
+        fp.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
         file_name=f"producao_{ini}_a_{fim}.csv",
         mime="text/csv",
     )
 
+    # ------------------------------------------------------------------
+    # Upload de novas planilhas de produção
+    # ------------------------------------------------------------------
+    st.divider()
+    st.subheader("📤 Enviar planilhas de produção")
+    st.caption("Modo calculadora (demonstração): aceita os dois templates "
+               "(2022-2024 e Mapa 2025+), .ods ou .xlsx. Os arquivos são "
+               "processados apenas nesta sessão e descartados — nada é "
+               "armazenado. Envie planilhas de teste ou anonimizadas.")
+
+    col_u1, col_u2 = st.columns(2)
+    ano_padrao = col_u1.selectbox(
+        "Ano (usado se o arquivo não informar)", list(range(2022, 2031)),
+        index=list(range(2022, 2031)).index(2026))
+    mes_padrao = col_u2.selectbox(
+        "Mês (usado se o arquivo não informar)", list(range(1, 13)),
+        format_func=lambda m: MESES_ABREV[m - 1])
+
+    uploads = st.file_uploader("Arquivos", type=["ods", "xlsx"],
+                               accept_multiple_files=True)
+
+    if uploads:
+        import tempfile
+
+        resultados = []
+        for up in uploads:
+            sufixo = Path(up.name).suffix.lower()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=sufixo) as tmp:
+                tmp.write(up.getbuffer())
+                caminho_tmp = Path(tmp.name)
+            try:
+                engine = "odf" if sufixo == ".ods" else "openpyxl"
+                sheets = pd.ExcelFile(caminho_tmp, engine=engine).sheet_names
+                if eh_template_v2(sheets):
+                    rs = parse_arquivo_v2(caminho_tmp)
+                else:
+                    rs = [parse_arquivo(caminho_tmp)]
+            except Exception as e:
+                st.error(f"{up.name}: falha ao abrir — {type(e).__name__}: {e}")
+                continue
+            finally:
+                caminho_tmp.unlink(missing_ok=True)
+
+            for r in rs:
+                # nome do profissional: fallback = nome do arquivo enviado
+                if not r.profissional.strip(" :.-"):
+                    r.profissional = Path(up.name).stem.strip().title()
+                    if not r.dados.empty:
+                        r.dados["profissional"] = r.profissional
+                if not r.dados.empty:
+                    if (r.dados["ano"] == 0).all():
+                        r.dados["ano"] = ano_padrao
+                    if (r.dados["mes"] == 0).all():
+                        r.dados["mes"] = mes_padrao
+                r.arquivo = f"{up.name}" + (f" [{r.arquivo.split('[')[-1]}"
+                                            if "[" in r.arquivo else "")
+                resultados.append(r)
+
+        validos = [r for r in resultados if r.ok]
+        st.markdown(f"**{len(validos)}** competência(s) válida(s) de "
+                    f"**{len(uploads)}** arquivo(s):")
+        linhas_resumo = []
+        for r in resultados:
+            d = r.dados
+            linhas_resumo.append({
+                "arquivo": r.arquivo,
+                "status": "✅ ok" if r.ok else ("❌ " + "; ".join(r.erros)[:60]
+                                               if r.erros else "vazio"),
+                "profissional": r.profissional,
+                "função": r.funcao,
+                "competência": (f"{int(d['mes'].iat[0]):02d}/{int(d['ano'].iat[0])}"
+                                if not d.empty else "—"),
+                "lançamentos": len(d),
+                "avisos": len(r.avisos),
+            })
+        st.dataframe(pd.DataFrame(linhas_resumo), use_container_width=True,
+                     hide_index=True)
+
+        avisos_todos = [f"{r.arquivo}: {a}" for r in resultados for a in r.avisos]
+        if avisos_todos:
+            with st.expander(f"⚠️ Avisos de qualidade ({len(avisos_todos)})"):
+                for a in avisos_todos:
+                    st.caption(a)
+
+        if validos:
+            st.markdown("##### Indicadores calculados a partir dos arquivos enviados")
+            novos = pd.concat([r.dados for r in validos], ignore_index=True)
+            ind_upload = calcular_serie(novos)
+            st.dataframe(ind_upload, use_container_width=True, hide_index=True)
+            st.caption("🔒 Nada foi armazenado: processamento em memória, "
+                       "descartado ao fim da sessão.")
+
     st.divider()
     st.caption(
         "OdontoProd — TCC MBA em Data Science & Analytics (USP/Esalq). "
-        "Demonstração com dados anonimizados. Fonte: planilhas mensais de produção (2022–2024), "
+        "Demonstração com dados anonimizados. Fonte: planilhas mensais de produção (2022–2026), "
         "processadas por pipeline auditável. Indicadores calculados a partir "
         "dos lançamentos diários; totais sempre recalculados."
     )
