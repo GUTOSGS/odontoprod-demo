@@ -131,9 +131,12 @@ if f.empty:
 
 # ----------------------------------------------------------------------
 titulo_abas = ["📊 Visão Geral", "👤 Produtividade Individual",
-               "⚖️ Comparativo", "🩺 Indicadores Clínicos",
-               "📁 Dados & Exportação"]
-aba1, aba2, aba3, aba4, aba5 = st.tabs(titulo_abas)
+               "🎯 Avaliação Individual", "⚖️ Comparativo",
+               "🩺 Indicadores Clínicos", "📁 Dados & Exportação"]
+aba1, aba2, aba_av, aba3, aba4, aba5 = st.tabs(titulo_abas)
+
+# indicadores em que valor MENOR é melhor (inverte leitura do percentil)
+MENOR_MELHOR = {"taxa_absenteismo_pct", "media_faltas_dia", "pct_exodontias"}
 
 
 def kpi_fmt(v, casas=1, sufixo=""):
@@ -255,6 +258,161 @@ with aba2:
         fig.update_layout(height=360, xaxis_title=None, yaxis_title=None,
                           margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================================
+# ABA — AVALIAÇÃO INDIVIDUAL COMPLETA
+# ======================================================================
+with aba_av:
+    # Base de comparação: TODOS os profissionais da(s) função(ões) no
+    # período — ignora o filtro de profissionais da barra lateral, para a
+    # referência da rede ser sempre íntegra.
+    base_cmp = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
+                   & (ind["funcao"].isin(funcoes))]
+    if base_cmp.empty:
+        st.info("Sem dados no período/função selecionados.")
+    else:
+        c_sel1, c_sel2 = st.columns([1, 2])
+        prof_av = c_sel1.selectbox(
+            "Profissional avaliado", sorted(base_cmp["profissional"].unique()),
+            key="av_prof")
+        inds_disp = list(INDICADORES_ROTULOS.keys())
+        sel = c_sel2.multiselect(
+            "Indicadores (vazio = todos)", inds_disp, default=[],
+            format_func=INDICADORES_ROTULOS.get, key="av_inds")
+        inds_sel = sel or inds_disp
+
+        medida = st.radio(
+            "Referência de comparação com a rede",
+            ["Média ± desvio-padrão", "Mediana + intervalo interquartílico (IIQ)"],
+            horizontal=True, key="av_medida")
+        usa_media = medida.startswith("Média")
+
+        g = base_cmp[base_cmp["profissional"] == prof_av].sort_values("competencia")
+        info = g.iloc[-1]
+        n_profs = base_cmp["profissional"].nunique()
+        st.markdown(f"### {prof_av}")
+        st.caption(
+            f"{'Cirurgião-dentista' if info['funcao'] == 'dentista' else 'Técnico em saúde bucal'}"
+            f" · Unidade: {info['unidade'] or '—'} · "
+            f"{g['competencia'].nunique()} competência(s) no período "
+            f"({fmt_comp(ini)} a {fmt_comp(fim)}) · "
+            f"comparado com {n_profs} profissionais da rede")
+
+        # ---------- tabela-síntese com percentil ----------
+        por_prof = base_cmp.groupby("profissional")[inds_disp].mean()
+        linhas_av = []
+        percentis_radar = {}
+        for k in inds_sel:
+            serie = por_prof[k].dropna()
+            if prof_av not in serie.index or len(serie) < 2:
+                continue
+            valor = serie[prof_av]
+            pct = float(serie.rank(pct=True)[prof_av] * 100)
+            pct_ajust = 100 - pct if k in MENOR_MELHOR else pct
+            percentis_radar[k] = pct_ajust
+            q1, q3 = serie.quantile(0.25), serie.quantile(0.75)
+            if pct_ajust >= 75:
+                situacao = "🟢 acima da rede"
+            elif pct_ajust >= 25:
+                situacao = "🟡 dentro da rede"
+            else:
+                situacao = "🔴 abaixo da rede"
+            linhas_av.append({
+                "Indicador": INDICADORES_ROTULOS[k]
+                             + (" ↓" if k in MENOR_MELHOR else ""),
+                prof_av: round(valor, 2),
+                "Média rede": round(serie.mean(), 2),
+                "DP": round(serie.std(), 2),
+                "Mediana": round(serie.median(), 2),
+                "IIQ (P25–P75)": f"{q1:.2f} – {q3:.2f}",
+                "Percentil": f"{pct:.0f}º",
+                "Situação": situacao,
+            })
+        st.dataframe(pd.DataFrame(linhas_av), use_container_width=True,
+                     hide_index=True)
+        st.caption("↓ = indicador em que valor MENOR é melhor (absenteísmo, "
+                   "faltas/dia, % exodontias); a coluna Situação já considera "
+                   "isso. Percentil calculado sobre a média de cada "
+                   "profissional no período.")
+
+        col_radar, col_destaques = st.columns([1, 1])
+
+        # ---------- radar de posição relativa ----------
+        with col_radar:
+            if len(percentis_radar) >= 3:
+                rotulos = [INDICADORES_ROTULOS[k][:28] for k in percentis_radar]
+                valores = list(percentis_radar.values())
+                fig = go.Figure(go.Scatterpolar(
+                    r=valores + valores[:1],
+                    theta=rotulos + rotulos[:1],
+                    fill="toself", line=dict(color=AZUL),
+                    name=prof_av))
+                fig.add_trace(go.Scatterpolar(
+                    r=[50] * (len(rotulos) + 1),
+                    theta=rotulos + rotulos[:1],
+                    line=dict(color="#999999", dash="dot"),
+                    name="Mediana da rede (P50)"))
+                fig.update_layout(
+                    title="Posição relativa na rede (percentil ajustado)",
+                    polar=dict(radialaxis=dict(range=[0, 100], tickvals=[25, 50, 75])),
+                    height=420, legend=dict(orientation="h", y=-0.15),
+                    margin=dict(t=60, b=20))
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Selecione ao menos 3 indicadores para o radar.")
+
+        # ---------- destaques automáticos ----------
+        with col_destaques:
+            st.markdown("##### Destaques do período")
+            ordenado = sorted(percentis_radar.items(), key=lambda x: x[1])
+            for k, v in reversed(ordenado[-3:]):
+                st.success(f"**{INDICADORES_ROTULOS[k]}** — percentil "
+                           f"ajustado {v:.0f} (ponto forte)")
+            for k, v in ordenado[:3]:
+                if v < 50:
+                    st.error(f"**{INDICADORES_ROTULOS[k]}** — percentil "
+                             f"ajustado {v:.0f} (oportunidade de melhoria)")
+            st.caption("Percentil ajustado: 100 = melhor posição da rede, "
+                       "já considerando a direção de cada indicador.")
+
+        # ---------- evolução mensal com banda da rede ----------
+        st.markdown("##### Evolução mensal × rede "
+                    + ("(média ± 1 DP)" if usa_media else "(mediana + IIQ)"))
+        colunas_graf = st.columns(2)
+        for i, k in enumerate(inds_sel):
+            stats = (base_cmp.groupby("competencia")[k]
+                     .agg(media="mean", dp="std", mediana="median",
+                          q25=lambda s: s.quantile(0.25),
+                          q75=lambda s: s.quantile(0.75))
+                     .reindex(sorted(base_cmp["competencia"].unique())))
+            if usa_media:
+                centro = stats["media"]
+                sup = stats["media"] + stats["dp"]
+                inf = (stats["media"] - stats["dp"]).clip(lower=0)
+                nome_centro = "Média da rede"
+            else:
+                centro = stats["mediana"]
+                sup, inf = stats["q75"], stats["q25"]
+                nome_centro = "Mediana da rede"
+
+            fig = go.Figure()
+            fig.add_scatter(x=stats.index, y=sup, line=dict(width=0),
+                            showlegend=False, hoverinfo="skip")
+            fig.add_scatter(x=stats.index, y=inf, line=dict(width=0),
+                            fill="tonexty", fillcolor="rgba(100,140,200,0.18)",
+                            name="Faixa da rede", hoverinfo="skip")
+            fig.add_scatter(x=stats.index, y=centro, name=nome_centro,
+                            line=dict(color="#888888", dash="dash", width=1.6))
+            fig.add_scatter(x=g["competencia"], y=g[k], name=prof_av,
+                            mode="lines+markers",
+                            line=dict(color=AZUL, width=2.6))
+            fig.update_layout(
+                title=INDICADORES_ROTULOS[k]
+                      + (" (menor é melhor)" if k in MENOR_MELHOR else ""),
+                height=300, margin=dict(t=45, b=10),
+                legend=dict(orientation="h", y=-0.3),
+                xaxis=dict(tickvals=list(stats.index)[::max(1, len(stats)//8)]))
+            colunas_graf[i % 2].plotly_chart(fig, use_container_width=True)
 
 # ======================================================================
 # ABA 3 — COMPARATIVO
