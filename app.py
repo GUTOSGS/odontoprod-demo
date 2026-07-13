@@ -16,8 +16,10 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 from src.auth import barra_usuario, exigir_login
+from src.indicadores.grupos import ORDEM_GRUPOS, aplicar_grupos
 from src.indicadores.motor import calcular_serie
 from src.relatorios.avaliacao_pdf import gerar_pdf_avaliacao
+from src.relatorios.producao_pdf import gerar_pdf_producao
 from src.ingestao.parser_mapa_v2 import eh_template_v2, parse_arquivo_v2
 from src.ingestao.parser_ods import parse_arquivo
 
@@ -133,8 +135,9 @@ if f.empty:
 # ----------------------------------------------------------------------
 titulo_abas = ["📊 Visão Geral", "👤 Produtividade Individual",
                "🎯 Avaliação Individual", "⚖️ Comparativo",
-               "🩺 Indicadores Clínicos", "📁 Dados & Exportação"]
-aba1, aba2, aba_av, aba3, aba4, aba5 = st.tabs(titulo_abas)
+               "🩺 Indicadores Clínicos", "📋 Produção da Rede",
+               "📁 Dados & Exportação"]
+aba1, aba2, aba_av, aba3, aba4, aba_prod, aba5 = st.tabs(titulo_abas)
 
 # indicadores em que valor MENOR é melhor (inverte leitura do percentil)
 MENOR_MELHOR = {"taxa_absenteismo_pct", "media_faltas_dia", "pct_exodontias"}
@@ -583,6 +586,115 @@ with aba4:
                           xaxis_title=None, yaxis_title=None,
                           coloraxis_showscale=False, margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================================
+# ABA — PRODUÇÃO CONSOLIDADA DA REDE
+# ======================================================================
+with aba_prod:
+    st.subheader("Produção consolidada da rede no período")
+    st.caption(f"Período: {fmt_comp(ini)} a {fmt_comp(fim)} · rede completa "
+               "(este módulo ignora os filtros de função e profissional). "
+               "Consultas/agenda (sem código SIGTAP), preventivos e "
+               "curativos são totalizados SEPARADAMENTE — nunca somados.")
+
+    base_rede = prod[(prod["competencia"] >= ini)
+                     & (prod["competencia"] <= fim)]
+    base_rede = aplicar_grupos(base_rede)
+    grupos_presentes = [g for g in ORDEM_GRUPOS
+                        if g in set(base_rede["grupo"])]
+
+    # ---------- KPIs por grupo principal ----------
+    def _total(grupo=None, chaves=None):
+        m = base_rede["grupo"] == grupo if grupo else \
+            base_rede["chave"].isin(chaves)
+        return int(base_rede.loc[m, "quantidade"].sum())
+
+    consultas_realizadas = _total(chaves=["consulta_no_dia",
+                                          "consulta_retorno",
+                                          "consulta_manutencao"])
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Consultas realizadas (agenda)",
+              f"{consultas_realizadas:,}".replace(",", "."))
+    c2.metric("Atendimentos SIGTAP",
+              f"{_total('Atendimentos e consultas (SIGTAP)'):,}".replace(",", "."))
+    c3.metric("Preventivos",
+              f"{_total('Preventivos e ações coletivas'):,}".replace(",", "."))
+    c4.metric("Curativos",
+              f"{_total('Curativos e reabilitadores'):,}".replace(",", "."))
+    c5.metric("Cirúrgicos",
+              f"{_total('Cirúrgicos'):,}".replace(",", "."))
+    c6.metric("Diagnósticos",
+              f"{_total('Diagnósticos (radiografias, biópsias)'):,}".replace(",", "."))
+
+    # ---------- evolução mensal por grupo (empilhado) ----------
+    serie_g = (base_rede.groupby(["competencia", "grupo"])["quantidade"]
+               .sum().unstack(fill_value=0)
+               .reindex(columns=grupos_presentes, fill_value=0)
+               .sort_index())
+    fig = go.Figure()
+    for g in grupos_presentes:
+        fig.add_bar(x=[fmt_comp(c) for c in serie_g.index],
+                    y=serie_g[g], name=g)
+    fig.update_layout(barmode="stack", height=420,
+                      title="Produção mensal por grupo — totalizações separadas",
+                      legend=dict(orientation="h", y=-0.35),
+                      margin=dict(t=50, b=10))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ---------- tabela detalhada: todos os itens da planilha ----------
+    st.markdown("##### Detalhamento por item da planilha (tudo o que foi registrado)")
+    detalhe = (base_rede.groupby(["grupo", "codigo_sigtap", "procedimento"],
+                                 dropna=False)["quantidade"]
+               .sum().reset_index()
+               .rename(columns={"codigo_sigtap": "código SIGTAP",
+                                "quantidade": "total no período"}))
+    detalhe["_ordem"] = detalhe["grupo"].map(
+        {g: i for i, g in enumerate(ORDEM_GRUPOS)})
+    detalhe = (detalhe.sort_values(["_ordem", "total no período"],
+                                   ascending=[True, False])
+               .drop(columns="_ordem"))
+    detalhe["total no período"] = detalhe["total no período"].astype(int)
+    st.dataframe(detalhe, use_container_width=True, height=420,
+                 hide_index=True)
+
+    # ---------- exportações ----------
+    col_e1, col_e2, col_e3 = st.columns([1, 1, 2])
+    col_e1.download_button(
+        "⬇️ Baixar detalhamento (CSV)",
+        detalhe.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+        file_name=f"producao_rede_{ini}_a_{fim}.csv", mime="text/csv",
+        key="prod_csv")
+
+    params_prod = (ini, fim)
+    if col_e2.button("🖨️ Gerar relatório PDF", key="prod_pdf_btn",
+                     type="primary"):
+        with st.spinner("Montando o relatório..."):
+            total_geral = float(base_rede["quantidade"].sum())
+            resumo = [{"grupo": g,
+                       "total": float(serie_g[g].sum()),
+                       "participacao": 100 * float(serie_g[g].sum()) / total_geral}
+                      for g in grupos_presentes]
+            pdf_bytes = gerar_pdf_producao(
+                periodo_txt=f"{fmt_comp(ini)} a {fmt_comp(fim)}",
+                n_profissionais=base_rede["profissional"].nunique(),
+                resumo_grupos=resumo,
+                labels_serie=[fmt_comp(c) for c in serie_g.index],
+                series_grupos={g: serie_g[g].tolist()
+                               for g in grupos_presentes},
+                detalhe=[{"grupo": r["grupo"],
+                          "codigo": r["código SIGTAP"],
+                          "procedimento": r["procedimento"],
+                          "total": r["total no período"]}
+                         for _, r in detalhe.iterrows()],
+            )
+        st.session_state["prod_pdf"] = (params_prod, pdf_bytes)
+    if (st.session_state.get("prod_pdf")
+            and st.session_state["prod_pdf"][0] == params_prod):
+        col_e3.download_button(
+            "⬇️ Baixar relatório de produção (PDF)",
+            st.session_state["prod_pdf"][1],
+            file_name=f"producao_rede_{ini}_a_{fim}.pdf",
+            mime="application/pdf", key="prod_pdf_dl")
 
 # ======================================================================
 # ABA 5 — DADOS & EXPORTAÇÃO
