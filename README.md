@@ -28,3 +28,20 @@ streamlit run app.py
 ```
 
 Configure as credenciais em `.streamlit/secrets.toml` (ver `src/auth.py`).
+
+## Testes
+
+A suíte cobre o motor de indicadores, o classificador de grupos de produção,
+o parser das planilhas municipais (incluindo planilha com defeito proposital:
+mês divergente, dia fora de sequência, total que não fecha e linha criada à
+mão) e a **anonimização dos dados publicados aqui**.
+
+```bash
+pip install -r requirements-dev.txt
+python verificar.py          # flake8 + pytest
+python -m pytest             # só os testes
+```
+
+O teste de anonimização (`tests/test_anonimizacao.py`) falha se algum
+identificador real, ou algum arquivo do ambiente local com dado nominal,
+chegar a este repositório — é a guarda que mantém a demonstração publicável.

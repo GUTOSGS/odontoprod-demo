@@ -218,7 +218,9 @@ with aba2:
 
     info = g.iloc[-1]
     st.subheader(f"{prof}")
-    st.caption(f"{'Cirurgião-dentista' if info['funcao'] == 'dentista' else 'Técnico em saúde bucal'}"
+    rotulo_funcao = ("Cirurgião-dentista" if info["funcao"] == "dentista"
+                     else "Técnico em saúde bucal")
+    st.caption(f"{rotulo_funcao}"
                f" · Unidade: {info['unidade'] or '—'} · "
                f"{g['competencia'].nunique()} competências no período")
 
@@ -321,9 +323,10 @@ with aba_av:
                 situacao = "🟡 dentro da rede"
             else:
                 situacao = "🔴 abaixo da rede"
+            rotulo = (INDICADORES_ROTULOS[k]
+                      + (" ↓" if k in MENOR_MELHOR else ""))
             linhas_av.append({
-                "Indicador": INDICADORES_ROTULOS[k]
-                             + (" ↓" if k in MENOR_MELHOR else ""),
+                "Indicador": rotulo,
                 prof_av: round(valor, 2),
                 "Média rede": round(serie.mean(), 2),
                 "DP": round(serie.std(), 2),
@@ -341,12 +344,12 @@ with aba_av:
 
         # estruturas para o relatório PDF
         tabela_pdf = [{
-            "Indicador": l["Indicador"], "valor": str(l[prof_av]),
-            "media": str(l["Média rede"]), "dp": str(l["DP"]),
-            "mediana": str(l["Mediana"]), "iiq": l["IIQ (P25–P75)"],
-            "percentil": l["Percentil"],
-            "situacao": l["Situação"].split(" ", 1)[1],
-        } for l in linhas_av]
+            "Indicador": linha["Indicador"], "valor": str(linha[prof_av]),
+            "media": str(linha["Média rede"]), "dp": str(linha["DP"]),
+            "mediana": str(linha["Mediana"]), "iiq": linha["IIQ (P25–P75)"],
+            "percentil": linha["Percentil"],
+            "situacao": linha["Situação"].split(" ", 1)[1],
+        } for linha in linhas_av]
         ordenado = sorted(percentis_radar.items(), key=lambda x: x[1])
         fortes_txt = [f"{INDICADORES_ROTULOS[k]} — percentil ajustado {v:.0f}"
                       for k, v in reversed(ordenado[-3:])]
@@ -421,9 +424,10 @@ with aba_av:
             fig.add_scatter(x=g["competencia"], y=g[k], name=prof_av,
                             mode="lines+markers",
                             line=dict(color=AZUL, width=2.6))
+            titulo_graf = (INDICADORES_ROTULOS[k]
+                           + (" (menor é melhor)" if k in MENOR_MELHOR else ""))
             fig.update_layout(
-                title=INDICADORES_ROTULOS[k]
-                      + (" (menor é melhor)" if k in MENOR_MELHOR else ""),
+                title=titulo_graf,
                 height=300, margin=dict(t=45, b=10),
                 legend=dict(orientation="h", y=-0.3),
                 xaxis=dict(tickvals=list(stats.index)[::max(1, len(stats)//8)]))
@@ -508,7 +512,8 @@ with aba3:
                           margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("##### Matriz indicador × profissional (média no período, escala normalizada por indicador)")
+    st.markdown("##### Matriz indicador × profissional "
+                "(média no período, escala normalizada por indicador)")
     cols_matriz = ["media_atend_dia", "media_proc_dia", "taxa_absenteismo_pct",
                    "razao_tc", "media_prev_dia", "pct_exodontias", "razao_rest_exo"]
     mat = f.groupby("profissional")[cols_matriz].mean()

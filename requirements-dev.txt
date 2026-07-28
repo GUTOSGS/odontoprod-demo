@@ -1,0 +1,7 @@
+# Dependências apenas de desenvolvimento — NÃO entram no requirements.txt
+# para não serem instaladas no Streamlit Community Cloud.
+#
+#   pip install -r requirements-dev.txt
+#   python verificar.py
+pytest>=7.4
+flake8>=7.0

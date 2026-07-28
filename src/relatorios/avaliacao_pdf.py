@@ -69,9 +69,10 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
         if tabela_linhas:
             cab = ["Indicador", "Profis-\nsional", "Média\nrede", "DP",
                    "Mediana", "IIQ\n(P25–P75)", "Per-\ncentil", "Situação"]
-            celulas = [[l["Indicador"], l["valor"], l["media"], l["dp"],
-                        l["mediana"], l["iiq"], l["percentil"], l["situacao"]]
-                       for l in tabela_linhas]
+            celulas = [[ln["Indicador"], ln["valor"], ln["media"], ln["dp"],
+                        ln["mediana"], ln["iiq"], ln["percentil"],
+                        ln["situacao"]]
+                       for ln in tabela_linhas]
             ax = fig.add_axes([0.05, 0.06, 0.90, 0.72])
             ax.axis("off")
             tab = ax.table(cellText=celulas, colLabels=cab, loc="upper center",
