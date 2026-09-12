@@ -1,4 +1,6 @@
-# credenciais NUNCA vão para o repositório (configurar em Settings > Secrets no Streamlit Cloud)
-.streamlit/secrets.toml
+# credenciais NUNCA vão para o repositório (configurar em Settings > Secrets
+# no Streamlit Cloud). A pasta inteira fica de fora, para pegar também os
+# backups que gerar_senha.py cria ao trocar uma senha.
+.streamlit/
 __pycache__/
 *.pyc

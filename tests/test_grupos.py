@@ -67,6 +67,37 @@ def test_aplicar_grupos_preserva_linhas_e_so_acrescenta_a_coluna():
     assert "grupo" not in df.columns
 
 
+def test_nulos_de_origens_diferentes_nao_quebram_a_classificacao():
+    """Regressão: None, NaN do numpy e NaN nativo convivem na mesma coluna
+    quando a base é concatenada com dado de upload ou lido de CSV. Como
+    NaN != NaN, a versão antiga levantava KeyError e derrubava a aba
+    Produção da Rede inteira."""
+    import numpy as np
+
+    df = pd.DataFrame({
+        "codigo_sigtap": [None, np.nan, float("nan"), "01.01.02.010-4"],
+        "categoria": ["agenda", "agenda", "procedimento", "procedimento"],
+        "quantidade": [1.0, 2.0, 3.0, 4.0],
+    })
+    saida = aplicar_grupos(df)
+
+    assert saida["grupo"].tolist() == [
+        "Consultas e agenda (sem código SIGTAP)",
+        "Consultas e agenda (sem código SIGTAP)",
+        "Outros registros (sem código SIGTAP)",
+        "Preventivos e ações coletivas",
+    ]
+
+
+def test_codigo_com_espaco_nao_vira_grupo_diferente():
+    df = pd.DataFrame({
+        "codigo_sigtap": ["04.14.02.013-8", " 04.14.02.013-8 "],
+        "categoria": ["procedimento", "procedimento"],
+        "quantidade": [1.0, 1.0],
+    })
+    assert aplicar_grupos(df)["grupo"].nunique() == 1
+
+
 def test_todo_grupo_produzido_esta_na_ordem_de_exibicao():
     """Se alguém criar um grupo novo sem incluí-lo em ORDEM_GRUPOS, os
     relatórios o perderiam silenciosamente."""

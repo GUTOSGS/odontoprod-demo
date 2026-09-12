@@ -269,18 +269,29 @@ with aba2:
 # ABA — AVALIAÇÃO INDIVIDUAL COMPLETA
 # ======================================================================
 with aba_av:
-    # Base de comparação: TODOS os profissionais da(s) função(ões) no
-    # período — ignora o filtro de profissionais da barra lateral, para a
-    # referência da rede ser sempre íntegra.
-    base_cmp = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
+    # Quem pode ser avaliado: respeita o filtro de função da barra lateral
+    # (mas ignora o de profissionais, para não restringir a escolha).
+    base_sel = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
                    & (ind["funcao"].isin(funcoes))]
-    if base_cmp.empty:
+    if base_sel.empty:
         st.info("Sem dados no período/função selecionados.")
     else:
         c_sel1, c_sel2 = st.columns([1, 2])
         prof_av = c_sel1.selectbox(
-            "Profissional avaliado", sorted(base_cmp["profissional"].unique()),
+            "Profissional avaliado", sorted(base_sel["profissional"].unique()),
             key="av_prof")
+
+        # COM QUEM ele é comparado: sempre a própria função, independente do
+        # filtro da barra lateral. Misturar CD e TSB desloca o percentil em
+        # dezenas de pontos (um técnico tem 0 atendimento/dia por definição
+        # do processo de trabalho, não por desempenho) e o semáforo muda de
+        # cor num relatório que vai para a mão do profissional.
+        funcao_av = (base_sel.loc[base_sel["profissional"] == prof_av, "funcao"]
+                     .mode().iat[0])
+        base_cmp = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
+                       & (ind["funcao"] == funcao_av)]
+        rotulo_pares = ("cirurgiões-dentistas" if funcao_av == "dentista"
+                        else "técnicos em saúde bucal")
         inds_disp = list(INDICADORES_ROTULOS.keys())
         sel = c_sel2.multiselect(
             "Indicadores (vazio = todos)", inds_disp, default=[],
@@ -302,7 +313,7 @@ with aba_av:
             f" · Unidade: {info['unidade'] or '—'} · "
             f"{g['competencia'].nunique()} competência(s) no período "
             f"({fmt_comp(ini)} a {fmt_comp(fim)}) · "
-            f"comparado com {n_profs} profissionais da rede")
+            f"comparado com {n_profs} {rotulo_pares} da rede")
 
         # ---------- tabela-síntese com percentil ----------
         por_prof = base_cmp.groupby("profissional")[inds_disp].mean()
@@ -313,8 +324,13 @@ with aba_av:
             if prof_av not in serie.index or len(serie) < 2:
                 continue
             valor = serie[prof_av]
+            # rank(pct=True) devolve (0, 1]: o melhor recebe 100. Para
+            # inverter um indicador em que menor é melhor, ranqueia-se o
+            # valor negativo — assim o melhor também chega a 100, em vez do
+            # 100 - 100/n que a subtração direta produzia.
+            base_rank = -serie if k in MENOR_MELHOR else serie
+            pct_ajust = float(base_rank.rank(pct=True)[prof_av] * 100)
             pct = float(serie.rank(pct=True)[prof_av] * 100)
-            pct_ajust = 100 - pct if k in MENOR_MELHOR else pct
             percentis_radar[k] = pct_ajust
             q1, q3 = serie.quantile(0.25), serie.quantile(0.75)
             if pct_ajust >= 75:
@@ -446,8 +462,7 @@ with aba_av:
 
         # ---------- relatório em PDF ----------
         st.divider()
-        params_pdf = (prof_av, ini, fim, tuple(inds_sel), medida,
-                      tuple(sorted(funcoes)))
+        params_pdf = (prof_av, ini, fim, tuple(inds_sel), medida, funcao_av)
         col_b1, col_b2 = st.columns([1, 2])
         if col_b1.button("🖨️ Gerar relatório PDF", key="av_pdf_btn",
                          type="primary"):

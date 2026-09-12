@@ -22,9 +22,6 @@ ORDEM_GRUPOS = [
     "Outros registros (sem código SIGTAP)",
 ]
 
-# grupos que representam produção CLÍNICA curativa (para totalizações)
-GRUPOS_CURATIVOS = {"Curativos e reabilitadores", "Cirúrgicos"}
-
 # profilaxia/remoção de placa é 03.07 mas de natureza preventiva
 _PREVENTIVOS_FORA_01 = {"03.07.03.004-0"}
 
@@ -51,12 +48,26 @@ def classificar(codigo_sigtap, categoria: str) -> str:
     return "Demais procedimentos SIGTAP"
 
 
+def _normalizar_codigo(valor) -> str:
+    """Devolve o código como texto, com qualquer forma de vazio virando "".
+
+    Necessário porque a coluna pode trazer None, NaN do numpy ou NaN do
+    pandas conforme a origem (parquet, CSV, upload, concatenação). Como
+    NaN != NaN, usar o valor cru como chave de dicionário levanta KeyError
+    quando dois nulos de origens diferentes convivem na mesma coluna.
+    """
+    if valor is None:
+        return ""
+    texto = str(valor).strip()
+    return "" if texto.lower() in ("nan", "none", "<na>") else texto
+
+
 def aplicar_grupos(df):
     """Adiciona a coluna 'grupo' a um DataFrame de lançamentos."""
     df = df.copy()
-    pares = df[["codigo_sigtap", "categoria"]].drop_duplicates()
-    mapa = {(c, cat): classificar(c, cat)
-            for c, cat in pares.itertuples(index=False)}
-    df["grupo"] = [mapa[(c, cat)] for c, cat in
-                   zip(df["codigo_sigtap"], df["categoria"])]
+    codigos = [_normalizar_codigo(c) for c in df["codigo_sigtap"]]
+    categorias = [str(cat) for cat in df["categoria"]]
+    mapa = {par: classificar(par[0] or None, par[1])
+            for par in set(zip(codigos, categorias))}
+    df["grupo"] = [mapa[par] for par in zip(codigos, categorias)]
     return df

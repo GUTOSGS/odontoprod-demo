@@ -57,9 +57,11 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
                  else "Técnico em saúde bucal")
         fig.text(0.08, 0.862,
                  f"{papel} · Unidade: {unidade or '—'}", fontsize=10)
+        pares = ("cirurgiões-dentistas" if funcao == "dentista"
+                 else "técnicos em saúde bucal")
         fig.text(0.08, 0.842,
                  f"Período: {periodo_txt} · {n_competencias} competência(s) · "
-                 f"comparado com {n_profs} profissionais da rede",
+                 f"comparado com {n_profs} {pares} da rede",
                  fontsize=10)
         fig.text(0.08, 0.822,
                  f"Referência de comparação: {referencia_txt} · "
