@@ -22,7 +22,8 @@ from pathlib import Path
 import pandas as pd
 
 from .parser_ods import (ResultadoParse, ROTULOS_AGENDA, SIGTAP_RE,
-                         _reparar_dias, _sem_acento, ano_do_caminho)
+                         _reparar_dias, _sem_acento, ano_do_caminho,
+                         unidade_plausivel)
 
 MESES_NOME = {
     "JANEIRO": 1, "FEVEREIRO": 2, "MARCO": 3, "ABRIL": 4, "MAIO": 5,
@@ -140,7 +141,13 @@ def _parse_aba(df: pd.DataFrame, res: ResultadoParse) -> None:
             if "UNIDADE" in plano and "SAUDE" in plano:
                 m = re.search(r"UNIDADE DE SAUDE\s*:?\s*(.*?)$", plano)
                 if m and m.group(1).strip():
-                    res.unidade = m.group(1).strip().title()
+                    candidato = m.group(1).strip().title()
+                    valida, motivo = unidade_plausivel(candidato)
+                    if valida:
+                        res.unidade = candidato
+                    else:
+                        res.avisos.append(
+                            f"Unidade descartada ({motivo}): {candidato!r}")
 
     linha_hdr, mapa_dias = _linha_dias_v2(df, res.avisos)
     if linha_hdr is None:

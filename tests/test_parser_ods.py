@@ -12,6 +12,7 @@ from src.ingestao.parser_ods import (
     _sem_acento,
     ano_do_caminho,
     parse_arquivo,
+    unidade_plausivel,
 )
 
 # ---------------------------------------------------------------- unidades
@@ -46,6 +47,28 @@ def test_dia_irreparavel_e_descartado_com_aviso():
     mapa = _reparar_dias({1: 10, 2: 3, 3: 25}, avisos)
     assert mapa == {1: 10, 3: 25}          # o 3 não tinha como ser inferido
     assert any("fora de ordem" in a for a in avisos)
+
+
+@pytest.mark.parametrize("texto,motivo", [
+    ("Dezembro", "nome de mês"),
+    ("JANEIRO", "nome de mês"),
+    ("março", "nome de mês"),
+    ("", "vazio"),
+    ("   ", "vazio"),
+    ("2022", "apenas números"),
+    ("AB", "curto demais"),
+])
+def test_unidade_implausivel_e_recusada(texto, motivo):
+    valida, dito = unidade_plausivel(texto)
+    assert valida is False
+    assert dito == motivo
+
+
+@pytest.mark.parametrize("texto", [
+    "Centro", "Mont Serrat", "Psf Vila Mendes", "Jardim Áurea", "UBS 3",
+])
+def test_unidade_legitima_e_aceita(texto):
+    assert unidade_plausivel(texto)[0] is True
 
 
 # ------------------------------------------------------------ fim a fim
@@ -130,6 +153,30 @@ def test_dias_trabalhados_desconsidera_dias_so_de_agenda(planilha_v1):
 def test_toda_decisao_automatica_vira_aviso(planilha_v1, trecho):
     avisos = parse_arquivo(planilha_v1).avisos
     assert any(trecho in a for a in avisos), f"faltou aviso sobre {trecho!r}"
+
+
+def test_mes_no_campo_de_unidade_nao_vira_unidade(tmp_path):
+    """Regressão do caso real de dez/2022: o campo de unidade recebeu o nome
+    do mês e a base ganhou uma 'unidade' chamada Dezembro, que atravessou
+    até o modelo dimensional."""
+    pasta = tmp_path / "PRODUÇÃO MENSAL 2022" / "12 DEZEMBRO"
+    pasta.mkdir(parents=True)
+    arquivo = pasta / "Talita.xlsx"
+    pd.DataFrame([
+        ["MÊS: DEZEMBRO", None, None, None, None],
+        ["UNIDADE DE SAÚDE: DEZEMBRO   DENTISTA: TALITA", None, None, None, None],
+        ["PRODUÇÃO ODONTOLOGIA", 1, 2, 3, "TOTAL"],
+        ["03.01.01.015-3 - PRIMEIRA CONSULTA", 2, 1, 4, 7],
+    ]).to_excel(arquivo, header=False, index=False)
+
+    res = parse_arquivo(arquivo)
+
+    assert res.unidade == ""                       # não aceita o mês
+    assert any("Unidade descartada" in a and "Dezembro" in a
+               for a in res.avisos)                # e avisa, em vez de calar
+    assert res.profissional == "Talita"            # o resto segue normal
+    assert res.mes == 12
+    assert not res.dados.empty
 
 
 def test_arquivo_ilegivel_nao_derruba_o_lote(tmp_path):

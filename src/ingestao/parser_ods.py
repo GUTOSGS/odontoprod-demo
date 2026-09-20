@@ -36,10 +36,34 @@ ROTULOS_AGENDA = {
 
 ROTULOS_IGNORAR = {"TOTAL", "DIAS", "PRODUCAO ODONTOLOGIA"}
 
+MESES_ORDEM = ("JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO",
+               "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO",
+               "DEZEMBRO")
+
 
 def _sem_acento(txt: str) -> str:
     nfkd = unicodedata.normalize("NFKD", str(txt))
     return "".join(c for c in nfkd if not unicodedata.combining(c)).upper().strip()
+
+
+def unidade_plausivel(texto: str) -> tuple[bool, str]:
+    """Diz se o texto extraído pode ser nome de unidade — e, se não, por quê.
+
+    O campo de unidade fica ao lado do campo de mês no cabeçalho da
+    planilha, e às vezes recebe o conteúdo errado: a base já carregava uma
+    "unidade" chamada Dezembro, vinda de um preenchimento trocado em
+    dez/2022. Em vez de aceitar em silêncio, o parser descarta e avisa.
+    """
+    plano = _sem_acento(texto)
+    if not plano:
+        return False, "vazio"
+    if plano in MESES_ORDEM:
+        return False, "nome de mês"
+    if plano.replace(" ", "").isdigit():
+        return False, "apenas números"
+    if len(plano) < 3:
+        return False, "curto demais"
+    return True, ""
 
 
 def ano_do_caminho(caminho: Path) -> int:
@@ -94,16 +118,17 @@ def _extrair_metadados(df: pd.DataFrame, res: ResultadoParse) -> None:
                     r"UNIDADE DE SAUDE\s*:?\s*(.*?)(?:DENTISTA|TECNIC|TSB\b|ASB\b|$)",
                     plano)
                 if m and m.group(1).strip():
-                    res.unidade = m.group(1).strip().title()
+                    candidato = m.group(1).strip().title()
+                    valida, motivo = unidade_plausivel(candidato)
+                    if valida:
+                        res.unidade = candidato
+                    else:
+                        res.avisos.append(
+                            f"Unidade descartada ({motivo}): {candidato!r}")
             if plano.startswith("MES"):
                 m = re.search(r"MES\s*:?\s*([A-ZÇ]+)", plano)
-                if m:
-                    meses = ["JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO",
-                             "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO",
-                             "NOVEMBRO", "DEZEMBRO"]
-                    nome = m.group(1)
-                    if nome in meses:
-                        res.mes = meses.index(nome) + 1
+                if m and m.group(1) in MESES_ORDEM:
+                    res.mes = MESES_ORDEM.index(m.group(1)) + 1
 
 
 def _dias_da_linha(df: pd.DataFrame, i: int) -> dict:
