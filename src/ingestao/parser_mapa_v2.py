@@ -298,4 +298,86 @@ def parse_arquivo_v2(caminho: str | Path) -> list[ResultadoParse]:
         r = ResultadoParse(arquivo=caminho.name)
         r.avisos.append("v2: nenhuma aba com lançamentos")
         resultados.append(r)
-    return resultados
+        return resultados
+    return resolver_conflitos_abas(resultados)
+
+
+# ----------------------------------------------------------------------
+# Aba genérica × aba do mês
+# ----------------------------------------------------------------------
+ABAS_GENERICAS = ("CIRURGI", "TECNIC", "TSB")
+PROPORCAO_QUASE_VAZIA = 0.25
+PREFIXO_CONFLITO = "Conflito de abas"
+
+
+def _nome_aba(resultado: ResultadoParse) -> str:
+    return resultado.arquivo.split("[")[-1].rstrip("]")
+
+
+def eh_aba_generica(nome_aba: str) -> bool:
+    """Aba do template sem mês no nome ('CIRURGIÃO-DENTISTA', 'TÉCNICA...')."""
+    plano = _sem_acento(nome_aba)
+    return any(g in plano for g in ABAS_GENERICAS)
+
+
+def resolver_conflitos_abas(resultados: list) -> list:
+    """Decide entre aba genérica e aba nomeada quando disputam o mesmo mês.
+
+    Contexto (achado de 21/09/2026): profissionais mantêm uma planilha
+    cumulativa e salvam uma cópia por mês. Nela convivem a aba genérica —
+    que não tem mês no nome e herda o mês da PASTA — e as abas nomeadas
+    ('ABRIL 2025'). A regra antiga do lote ficava com a MAIOR das duas, e
+    escolheu a genérica em 36 de 52 conflitos; em ao menos um caso
+    comprovado a genérica era cópia velha de outro mês.
+
+    Regra:
+      1. a aba nomeada vale para o mês que o nome dela declara;
+      2. a genérica só fica com o mês se não houver aba nomeada para ele —
+         exceto quando a aba nomeada está quase vazia (< 25% da genérica),
+         sinal de que o profissional abriu a aba do mês e não a preencheu;
+      3. conteúdo idêntico não é conflito: a cópia sai sem aviso;
+      4. todo conflito real gera aviso com prefixo fixo, para o relatório
+         de revisão da coordenação.
+    """
+    nomeadas = {}
+    for r in resultados:
+        if not r.dados.empty and not eh_aba_generica(_nome_aba(r)):
+            nomeadas[(r.ano, r.mes)] = r
+
+    manter = []
+    descartadas = set()
+    for r in resultados:
+        aba = _nome_aba(r)
+        if r.dados.empty or not eh_aba_generica(aba):
+            continue
+        rival = nomeadas.get((r.ano, r.mes))
+        if rival is None:
+            continue
+        t_gen = float(r.dados["quantidade"].sum())
+        t_nom = float(rival.dados["quantidade"].sum())
+        comp = f"{r.mes:02d}/{r.ano}"
+        colunas = ["dia", "chave", "quantidade"]
+        identicas = (r.dados[colunas].sort_values(colunas)
+                     .reset_index(drop=True)
+                     .equals(rival.dados[colunas].sort_values(colunas)
+                             .reset_index(drop=True)))
+        if identicas:
+            descartadas.add(id(r))
+            continue
+        if t_nom < PROPORCAO_QUASE_VAZIA * t_gen:
+            descartadas.add(id(rival))
+            aviso = (f"{PREFIXO_CONFLITO} em {comp}: aba do mês "
+                     f"'{_nome_aba(rival)}' quase vazia ({t_nom:g}) — mantida a "
+                     f"aba genérica '{aba}' ({t_gen:g})")
+        else:
+            descartadas.add(id(r))
+            aviso = (f"{PREFIXO_CONFLITO} em {comp}: mantida a aba do mês "
+                     f"'{_nome_aba(rival)}' ({t_nom:g}); descartada a aba "
+                     f"genérica '{aba}' ({t_gen:g})")
+        r.avisos.append(aviso)
+        rival.avisos.append(aviso)
+
+    for r in resultados:
+        if id(r) not in descartadas:
+            manter.append(r)
+    return manter
