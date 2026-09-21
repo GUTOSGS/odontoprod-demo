@@ -16,6 +16,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 from src.auth import barra_usuario, exigir_login
+from src.indicadores import metas
 from src.indicadores.grupos import ORDEM_GRUPOS, aplicar_grupos
 from src.indicadores.motor import calcular_serie
 from src.relatorios.avaliacao_pdf import gerar_pdf_avaliacao
@@ -133,11 +134,13 @@ if f.empty:
     st.stop()
 
 # ----------------------------------------------------------------------
-titulo_abas = ["📊 Visão Geral", "👤 Produtividade Individual",
+titulo_abas = ["📊 Visão Geral", "⏱️ Metas 2026",
+               "👤 Produtividade Individual",
                "🎯 Avaliação Individual", "⚖️ Comparativo",
                "🩺 Indicadores Clínicos", "📋 Produção da Rede",
                "📁 Dados & Exportação"]
-aba1, aba2, aba_av, aba3, aba4, aba_prod, aba5 = st.tabs(titulo_abas)
+(aba1, aba_metas, aba2, aba_av, aba3, aba4, aba_prod,
+ aba5) = st.tabs(titulo_abas)
 
 # indicadores em que valor MENOR é melhor (inverte leitura do percentil)
 MENOR_MELHOR = {"taxa_absenteismo_pct", "media_faltas_dia", "pct_exodontias"}
@@ -206,6 +209,181 @@ with aba1:
     fig.update_layout(height=max(350, 22 * len(hm)), xaxis_title=None,
                       yaxis_title=None, margin=dict(t=10, b=10))
     st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================================
+# ABA METAS 2026 — VELOCÍMETROS
+# ======================================================================
+VERMELHO_CLARO, VERDE_CLARO = "rgba(192,80,77,0.25)", "rgba(46,139,110,0.25)"
+
+
+def _translucida(hexa, alfa=0.45):
+    r, g, b = (int(hexa[i:i + 2], 16) for i in (1, 3, 5))
+    return f"rgba({r},{g},{b},{alfa})"
+
+
+def velocimetro(valor, titulo, eixo, passos=(), meta=None, sentido=None,
+                sufixo="", casas=1):
+    """Velocímetro plotly: faixas coloridas ao fundo, ponteiro em barra e,
+    havendo meta, linha de referência e diferença em relação a ela."""
+    indicador = go.Indicator(
+        mode="gauge+number" + ("+delta" if meta is not None else ""),
+        value=valor,
+        number={"suffix": sufixo, "valueformat": f".{casas}f"},
+        title={"text": titulo, "font": {"size": 14}},
+        gauge={
+            "axis": {"range": [0, eixo]},
+            "bar": {"color": AZUL, "thickness": 0.3},
+            "steps": [{"range": [a, b], "color": c} for a, b, c in passos],
+            **({"threshold": {"line": {"color": "#222", "width": 3},
+                              "thickness": 0.85, "value": meta}}
+               if meta is not None else {}),
+        },
+        **({"delta": {"reference": meta, "valueformat": f".{casas}f",
+                      "increasing": {"color": "#2e8b6e" if sentido == "minimo"
+                                     else "#c0504d"},
+                      "decreasing": {"color": "#c0504d" if sentido == "minimo"
+                                     else "#2e8b6e"}}}
+           if meta is not None else {}),
+    )
+    fig = go.Figure(indicador)
+    fig.update_layout(height=230, margin=dict(t=60, b=10, l=25, r=25),
+                      separators=",.")
+    return fig
+
+
+def _selo(faixa):
+    return (f"<span style='background:{metas.CORES[faixa]};color:white;"
+            f"padding:2px 10px;border-radius:10px;font-size:0.85em'>"
+            f"{faixa}</span>")
+
+
+with aba_metas:
+    st.subheader("Metas 2026 — indicadores ministeriais e operacionais")
+    st.caption(
+        "Fonte das metas: resumo municipal de indicadores de saúde bucal "
+        "para o planejamento 2026 (coordenação). As faixas ministeriais B1-B6 "
+        "são proposta de referência para pactuação, não meta local "
+        "formalizada. Os valores respeitam os filtros da barra lateral e "
+        "somam numeradores e denominadores do recorte (nunca média de "
+        "percentuais).")
+
+    recorte = st.radio("Recorte", ["Rede (filtros atuais)", "Um profissional"],
+                       horizontal=True, key="metas_recorte")
+    f_m, fp_m = f, fp
+    if recorte == "Um profissional":
+        prof_m = st.selectbox("Profissional",
+                              sorted(f["profissional"].unique()),
+                              key="metas_prof")
+        f_m = f[f["profissional"] == prof_m]
+        fp_m = fp[fp["profissional"] == prof_m]
+
+    valores = metas.calcular(f_m, fp_m)
+
+    st.markdown("#### Indicadores ministeriais (B1-B6)")
+    st.caption(
+        "B2, B3, B5 e B6 são **aproximações** a partir das planilhas locais, "
+        "por profissional. O valor oficial é apurado no SIAPS por equipe "
+        "(INE), com os códigos elegíveis de cada nota metodológica.")
+    colunas = st.columns(3)
+    for i, spec in enumerate(metas.MINISTERIAIS):
+        with colunas[i % 3]:
+            titulo = f"{spec['codigo']} · {spec['nome']}"
+            if not spec["calculavel"]:
+                st.markdown(f"**{titulo}**")
+                st.info(f"Não calculável pelas planilhas: {spec['motivo']}. "
+                        f"Faixa ótima: {spec['otima']}.")
+                continue
+            v = valores[spec["codigo"]]
+            if v is None:
+                st.markdown(f"**{titulo}**")
+                st.warning("Não calculável no recorte (denominador zero).")
+                continue
+            eixo = max(spec["eixo"], round(v * 1.1))
+            passos = [(a, b if b < spec["eixo"] else eixo,
+                       _translucida(metas.CORES[faixa]))
+                      for a, b, faixa in spec["passos"]]
+            st.plotly_chart(velocimetro(v, titulo, eixo, passos, sufixo="%"),
+                            use_container_width=True,
+                            key=f"vel_{spec['codigo']}")
+            st.markdown(f"<div style='text-align:center;margin-top:-12px'>"
+                        f"{_selo(spec['faixa'](v))} &nbsp;"
+                        f"<small>ótimo: {spec['otima']}</small></div>",
+                        unsafe_allow_html=True)
+
+    st.markdown("#### Metas operacionais da RASB do município")
+    st.caption(
+        "O documento não define se cada meta é teto ou mínimo. Aqui: "
+        "agendamentos e dias trabalhados como **mínimo**; faltas, urgências "
+        "e consultas por tratamento como **teto** — proposta até a "
+        "pactuação. A linha preta marca a meta; o número pequeno é a "
+        "diferença em relação a ela.")
+    colunas = st.columns(4)
+    for i, spec in enumerate(metas.OPERACIONAIS):
+        with colunas[i % 4]:
+            v = valores[spec["codigo"]]
+            titulo = spec["nome"]
+            if v is None:
+                st.markdown(f"**{titulo}**")
+                st.warning("Não calculável no recorte.")
+                continue
+            meta = spec["meta"]
+            if meta is None:
+                eixo = max(1.0, v * 2)
+                passos = []
+            else:
+                eixo = max(meta * 2, v * 1.15)
+                abaixo, acima = ((VERMELHO_CLARO, VERDE_CLARO)
+                                 if spec["sentido"] == "minimo"
+                                 else (VERDE_CLARO, VERMELHO_CLARO))
+                passos = [(0, meta, abaixo), (meta, eixo, acima)]
+            st.plotly_chart(
+                velocimetro(v, titulo, eixo, passos, meta=meta,
+                            sentido=spec["sentido"], sufixo=spec["unidade"],
+                            casas=spec["casas"]),
+                use_container_width=True, key=f"vel_{spec['codigo']}")
+            ok = metas.atingiu(v, spec)
+            if ok is None:
+                legenda_meta = spec.get("nota", "sem meta definida")
+            else:
+                alvo = ("≥" if spec["sentido"] == "minimo" else "≤")
+                legenda_meta = (f"{'✅ atingida' if ok else '❌ não atingida'}"
+                                f" · meta {alvo} {kpi_fmt(meta, 0)}"
+                                f"{spec['unidade']}")
+            st.markdown(f"<div style='text-align:center;margin-top:-12px'>"
+                        f"<small>{legenda_meta}</small></div>",
+                        unsafe_allow_html=True)
+
+    if recorte.startswith("Rede"):
+        st.markdown("#### Quem atinge cada meta")
+        tab = metas.por_profissional(f, fp)
+        exibe = pd.DataFrame({"Profissional": tab["profissional"]})
+        for spec in metas.MINISTERIAIS:
+            if spec["calculavel"]:
+                exibe[spec["codigo"]] = [
+                    "—" if pd.isna(v) else
+                    f"{kpi_fmt(v, 1)}% · {spec['faixa'](v)}"
+                    for v in tab[spec["codigo"]]]
+        for spec in metas.OPERACIONAIS:
+            marca = {True: "✅ ", False: "❌ ", None: ""}
+            exibe[spec["nome"]] = [
+                "—" if pd.isna(v) else
+                marca[metas.atingiu(v, spec)]
+                + kpi_fmt(v, spec["casas"]) + spec["unidade"]
+                for v in tab[spec["codigo"]]]
+        st.dataframe(exibe, hide_index=True, use_container_width=True)
+
+    with st.expander("Como cada valor é calculado"):
+        for spec in metas.MINISTERIAIS + metas.OPERACIONAIS:
+            nome = f"**{spec['codigo']} · {spec['nome']}**"
+            st.markdown(f"- {nome}: " + spec.get(
+                "formula", f"não calculável — {spec.get('motivo', '')}"))
+        st.markdown(
+            "- Agendamentos e faltas usam só as competências em que o "
+            "profissional registrou agendados — quem não preenche o campo "
+            "não puxa a média da rede para baixo.\n"
+            "- Preventivos coletivos (flúor gel, bochecho, escovação "
+            "supervisionada) ficam fora de B3 e B5, que tratam de "
+            "procedimentos individuais.")
 
 # ======================================================================
 # ABA 2 — PRODUTIVIDADE INDIVIDUAL
