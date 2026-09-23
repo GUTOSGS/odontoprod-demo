@@ -213,7 +213,6 @@ with aba1:
 # ======================================================================
 # ABA METAS 2026 — VELOCÍMETROS
 # ======================================================================
-VERMELHO_CLARO, VERDE_CLARO = "rgba(192,80,77,0.25)", "rgba(46,139,110,0.25)"
 
 
 def _translucida(hexa, alfa=0.45):
@@ -261,11 +260,11 @@ with aba_metas:
     st.subheader("Metas 2026 — indicadores ministeriais e operacionais")
     st.caption(
         "Fonte das metas: resumo municipal de indicadores de saúde bucal "
-        "para o planejamento 2026 (coordenação). As faixas ministeriais B1-B6 "
-        "são proposta de referência para pactuação, não meta local "
-        "formalizada. Os valores respeitam os filtros da barra lateral e "
-        "somam numeradores e denominadores do recorte (nunca média de "
-        "percentuais).")
+        "para o planejamento 2026 (coordenação). Os valores respeitam os filtros "
+        "da barra lateral e somam numeradores e denominadores do recorte "
+        "(nunca média de percentuais). Cada indicador só aparece para a "
+        "função que o realiza: exodontia, tratamento concluído e urgência "
+        "são do cirurgião-dentista.")
 
     recorte = st.radio("Recorte", ["Rede (filtros atuais)", "Um profissional"],
                        horizontal=True, key="metas_recorte")
@@ -281,11 +280,15 @@ with aba_metas:
 
     st.markdown("#### Indicadores ministeriais (B1-B6)")
     st.caption(
-        "B2, B3, B5 e B6 são **aproximações** a partir das planilhas locais, "
-        "por profissional. O valor oficial é apurado no SIAPS por equipe "
-        "(INE), com os códigos elegíveis de cada nota metodológica.")
+        f"São **aproximações** a partir das planilhas locais, por "
+        f"profissional — o valor oficial é apurado no SIAPS por equipe "
+        f"(INE), com os códigos elegíveis de cada nota. B1 usa a população "
+        f"de referência de {metas.POPULACAO_POR_DENTISTA:,} pessoas por "
+        f"cirurgião-dentista, pactuada pela coordenação."
+        .replace(",", "."))
+    ministeriais = metas.aplicaveis(metas.MINISTERIAIS, funcoes)
     colunas = st.columns(3)
-    for i, spec in enumerate(metas.MINISTERIAIS):
+    for i, spec in enumerate(ministeriais):
         with colunas[i % 3]:
             titulo = f"{spec['codigo']} · {spec['nome']}"
             if not spec["calculavel"]:
@@ -312,14 +315,15 @@ with aba_metas:
 
     st.markdown("#### Metas operacionais da RASB do município")
     st.caption(
-        "O documento não define se cada meta é teto ou mínimo. Aqui: "
-        "agendamentos e dias trabalhados como **mínimo**; faltas, urgências "
-        "e consultas por tratamento como **teto** — proposta até a "
-        "pactuação. A linha preta marca a meta; o número pequeno é a "
-        "diferença em relação a ela.")
-    colunas = st.columns(4)
-    for i, spec in enumerate(metas.OPERACIONAIS):
-        with colunas[i % 4]:
+        "A meta municipal é a fronteira do **Ótimo**; abaixo dela vêm três "
+        "degraus de mesmo tamanho (um terço da meta), no formato das faixas "
+        "do Ministério. O sentido de cada meta — quanto mais, melhor ou "
+        "quanto menos, melhor — é o declarado no documento. A linha preta "
+        "marca a meta; o número pequeno é a diferença em relação a ela.")
+    operacionais = metas.aplicaveis(metas.OPERACIONAIS, funcoes)
+    colunas = st.columns(3)
+    for i, spec in enumerate(operacionais):
+        with colunas[i % 3]:
             v = valores[spec["codigo"]]
             titulo = spec["nome"]
             if v is None:
@@ -327,53 +331,48 @@ with aba_metas:
                 st.warning("Não calculável no recorte.")
                 continue
             meta = spec["meta"]
-            if meta is None:
-                eixo = max(1.0, v * 2)
-                passos = []
-            else:
-                eixo = max(meta * 2, v * 1.15)
-                abaixo, acima = ((VERMELHO_CLARO, VERDE_CLARO)
-                                 if spec["sentido"] == "minimo"
-                                 else (VERDE_CLARO, VERMELHO_CLARO))
-                passos = [(0, meta, abaixo), (meta, eixo, acima)]
+            limites = metas.limites_operacional(spec)
+            eixo = max(limites[-1][1], v * 1.15)
+            passos = [(a, b if b < limites[-1][1] else eixo,
+                       _translucida(metas.CORES[faixa]))
+                      for a, b, faixa in limites]
             st.plotly_chart(
                 velocimetro(v, titulo, eixo, passos, meta=meta,
                             sentido=spec["sentido"], sufixo=spec["unidade"],
                             casas=spec["casas"]),
                 use_container_width=True, key=f"vel_{spec['codigo']}")
-            ok = metas.atingiu(v, spec)
-            if ok is None:
-                legenda_meta = spec.get("nota", "sem meta definida")
-            else:
-                alvo = ("≥" if spec["sentido"] == "minimo" else "≤")
-                legenda_meta = (f"{'✅ atingida' if ok else '❌ não atingida'}"
-                                f" · meta {alvo} {kpi_fmt(meta, 0)}"
-                                f"{spec['unidade']}")
+            alvo = "≥" if spec["sentido"] == "minimo" else "≤"
             st.markdown(f"<div style='text-align:center;margin-top:-12px'>"
-                        f"<small>{legenda_meta}</small></div>",
+                        f"{_selo(metas.faixa_operacional(v, spec))} &nbsp;"
+                        f"<small>meta {alvo} {kpi_fmt(meta, 0)}"
+                        f"{spec['unidade']}</small><br>"
+                        f"<small style='opacity:.7'>"
+                        f"{metas.texto_faixas(spec)}</small></div>",
                         unsafe_allow_html=True)
 
     if recorte.startswith("Rede"):
         st.markdown("#### Quem atinge cada meta")
         tab = metas.por_profissional(f, fp)
         exibe = pd.DataFrame({"Profissional": tab["profissional"]})
-        for spec in metas.MINISTERIAIS:
+        for spec in ministeriais:
             if spec["calculavel"]:
                 exibe[spec["codigo"]] = [
                     "—" if pd.isna(v) else
                     f"{kpi_fmt(v, 1)}% · {spec['faixa'](v)}"
                     for v in tab[spec["codigo"]]]
-        for spec in metas.OPERACIONAIS:
-            marca = {True: "✅ ", False: "❌ ", None: ""}
+        for spec in operacionais:
             exibe[spec["nome"]] = [
                 "—" if pd.isna(v) else
-                marca[metas.atingiu(v, spec)]
-                + kpi_fmt(v, spec["casas"]) + spec["unidade"]
+                f"{kpi_fmt(v, spec['casas'])}{spec['unidade']} · "
+                f"{metas.faixa_operacional(v, spec)}"
                 for v in tab[spec["codigo"]]]
         st.dataframe(exibe, hide_index=True, use_container_width=True)
+        st.caption("Faixa de cada meta operacional: " + " | ".join(
+            f"**{s['nome']}** — {metas.texto_faixas(s)}"
+            for s in operacionais))
 
     with st.expander("Como cada valor é calculado"):
-        for spec in metas.MINISTERIAIS + metas.OPERACIONAIS:
+        for spec in ministeriais + operacionais:
             nome = f"**{spec['codigo']} · {spec['nome']}**"
             st.markdown(f"- {nome}: " + spec.get(
                 "formula", f"não calculável — {spec.get('motivo', '')}"))

@@ -14,6 +14,7 @@ def _spec(codigo):
 
 
 @pytest.mark.parametrize("codigo,valor,esperado", [
+    ("B1", 1.25, BOM), ("B1", 1.26, OTIMO), ("B1", 0.25, REGULAR),
     ("B2", 100.0, OTIMO), ("B2", 100.1, SEM_FAIXA), ("B2", 75.0, BOM),
     ("B2", 50.0, SUFICIENTE), ("B2", 25.0, REGULAR),
     ("B3", 2.99, REGULAR), ("B3", 3.0, OTIMO), ("B3", 10.0, BOM),
@@ -37,7 +38,8 @@ def test_passos_do_velocimetro_cobrem_o_eixo_sem_buraco():
 
 
 def _ind(**colunas):
-    base = {"profissional": ["A", "B"], "dias_trabalhados": [10, 10],
+    base = {"profissional": ["A", "B"], "funcao": ["dentista", "dentista"],
+            "dias_trabalhados": [10, 10],
             "agendados": [80, 0], "faltosos": [8, 5], "atendimentos": [50, 50],
             "urgencias": [10, 30], "trat_completados": [9, 0],
             "primeiras_consultas": [10, 10]}
@@ -89,11 +91,84 @@ def test_b3_b5_b6_usam_so_procedimentos_individuais():
     assert v["B6"] == 20.0            # 5 ÷ (20 + 5)
 
 
+def _op(codigo):
+    return next(m for m in metas.OPERACIONAIS if m["codigo"] == codigo)
+
+
 @pytest.mark.parametrize("codigo,valor,esperado", [
     ("O1", 8, True), ("O1", 7.9, False),
     ("O3", 10, True), ("O3", 10.1, False),
-    ("O2", 1.0, None), ("O1", None, None),
+    ("O1", None, None),
 ])
 def test_atingiu_respeita_o_sentido_da_meta(codigo, valor, esperado):
-    spec = next(m for m in metas.OPERACIONAIS if m["codigo"] == codigo)
-    assert metas.atingiu(valor, spec) is esperado
+    assert metas.atingiu(valor, _op(codigo)) is esperado
+
+
+# ---------------------------------------------------------- faixas das
+# metas operacionais: a meta é a fronteira do Ótimo e abaixo dela vêm três
+# degraus de um terço da meta (pactuado em 23/09/2026)
+@pytest.mark.parametrize("codigo,valor,esperado", [
+    # "quanto mais, melhor": meta 8 -> degraus de 2,67
+    ("O1", 9.0, OTIMO), ("O1", 8.0, OTIMO), ("O1", 7.9, BOM),
+    ("O1", 5.34, BOM), ("O1", 5.33, SUFICIENTE), ("O1", 2.6, REGULAR),
+    # "quanto menos, melhor": meta 10% -> degraus de 3,33
+    ("O3", 9.9, OTIMO), ("O3", 10.0, OTIMO), ("O3", 10.1, BOM),
+    ("O3", 13.3, BOM), ("O3", 15.0, SUFICIENTE), ("O3", 17.0, REGULAR),
+])
+def test_faixa_operacional_equidistante(codigo, valor, esperado):
+    assert metas.faixa_operacional(valor, _op(codigo)) == esperado
+
+
+def test_faixas_operacionais_sao_degraus_iguais_e_cobrem_o_eixo():
+    for spec in metas.OPERACIONAIS:
+        limites = metas.limites_operacional(spec)
+        larguras = [round(fim - ini, 6) for ini, fim, _ in limites[1:-1]]
+        assert len(set(larguras)) == 1, spec["codigo"]
+        assert round(larguras[0], 6) == round(spec["meta"] / 3, 6)
+        assert limites[0][0] == 0
+        for (_, fim, _), (ini, _, _) in zip(limites, limites[1:]):
+            assert fim == ini
+        assert [f for _, _, f in limites].count(OTIMO) == 1
+
+
+def test_faixa_sem_valor_e_none():
+    assert metas.faixa_operacional(None, _op("O1")) is None
+
+
+def test_texto_das_faixas_sai_na_ordem_do_melhor_para_o_pior():
+    assert (metas.texto_faixas(_op("O1"))
+            == "Ótimo: ≥ 8 · Bom: ≥ 5,33 · Suficiente: ≥ 2,67 "
+               "· Regular: < 2,67")
+    assert (metas.texto_faixas(_op("O3"))
+            == "Ótimo: ≤ 10% · Bom: ≤ 13,33% · Suficiente: ≤ 16,67% "
+               "· Regular: > 16,67%")
+
+
+# ------------------------------------------------- aplicação por função
+def test_indicadores_de_dentista_nao_aparecem_para_a_tecnica():
+    """A TSB não faz exodontia, restauração, tratamento concluído nem
+    urgência — medir isso nela só produziria zero."""
+    ministeriais = [s["codigo"] for s in
+                    metas.aplicaveis(metas.MINISTERIAIS, ["tecnico"])]
+    operacionais = [s["codigo"] for s in
+                    metas.aplicaveis(metas.OPERACIONAIS, ["tecnico"])]
+
+    assert ministeriais == ["B4", "B5"]
+    assert operacionais == ["O1", "O3", "O4"]
+
+
+def test_recorte_com_as_duas_funcoes_mostra_tudo():
+    assert (metas.aplicaveis(metas.OPERACIONAIS, ["dentista", "tecnico"])
+            == metas.OPERACIONAIS)
+
+
+def test_b1_usa_a_populacao_de_referencia_por_dentista():
+    """3.500 pessoas por CD por mês: 35 primeiras consultas = 1%."""
+    ind = _ind(funcao=["dentista", "dentista"],
+               primeiras_consultas=[35, 35])
+    assert metas.calcular(ind, _prod([]))["B1"] == 1.0
+
+
+def test_b1_ignora_as_observacoes_da_tecnica():
+    ind = _ind(funcao=["dentista", "tecnico"], primeiras_consultas=[35, 35])
+    assert metas.calcular(ind, _prod([]))["B1"] == 1.0
