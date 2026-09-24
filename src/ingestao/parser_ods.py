@@ -2,7 +2,7 @@
 """
 OdontoProd — Módulo 1: Parser de planilhas de produção odontológica (.ods)
 
-Estrutura esperada (template municipal de Varginha):
+Estrutura esperada (template municipal de produção mensal):
   - Metadados nas primeiras linhas: MÊS, UNIDADE DE SAÚDE, DENTISTA
   - Linha de cabeçalho com os dias do mês (1..31) + coluna TOTAL
   - Bloco de agenda (sem código SIGTAP): AGENDADOS, FALTOSOS, CONSULTA NO DIA,

@@ -82,7 +82,8 @@ def exigir_login() -> dict:
         return st.session_state["sessao"]
 
     st.markdown("## 🦷 OdontoProd")
-    st.caption("Painel de Produtividade em Saúde Bucal — APS Varginha/MG")
+    st.caption("Painel de Produtividade em Saúde Bucal — APS municipal "
+               "(demonstração com dados anonimizados)")
 
     with st.form("login"):
         usuario = st.text_input("Usuário")
