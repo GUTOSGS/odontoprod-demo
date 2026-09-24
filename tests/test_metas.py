@@ -15,6 +15,8 @@ def _spec(codigo):
 
 @pytest.mark.parametrize("codigo,valor,esperado", [
     ("B1", 1.25, BOM), ("B1", 1.26, OTIMO), ("B1", 0.25, REGULAR),
+    ("B4", 1.0, BOM), ("B4", 1.01, OTIMO), ("B4", 0.5, SUFICIENTE),
+    ("B4", 0.25, REGULAR),
     ("B2", 100.0, OTIMO), ("B2", 100.1, SEM_FAIXA), ("B2", 75.0, BOM),
     ("B2", 50.0, SUFICIENTE), ("B2", 25.0, REGULAR),
     ("B3", 2.99, REGULAR), ("B3", 3.0, OTIMO), ("B3", 10.0, BOM),
@@ -167,6 +169,31 @@ def test_b1_usa_a_populacao_de_referencia_por_dentista():
     ind = _ind(funcao=["dentista", "dentista"],
                primeiras_consultas=[35, 35])
     assert metas.calcular(ind, _prod([]))["B1"] == 1.0
+
+
+def test_b4_usa_18_por_cento_da_populacao_de_referencia():
+    """630 crianças de 6 a 12 anos por equipe: 63 participantes = 10%."""
+    assert metas.CRIANCAS_POR_DENTISTA == 630
+    ind = _ind(funcao=["dentista", "dentista"])
+    v = metas.calcular(ind, _prod([("01.01.02.003-1", 126)]))
+    assert v["B4"] == 10.0            # 126 ÷ (630 × 2 equipes-mês)
+
+
+def test_b4_conta_a_escovacao_da_tecnica_sem_duplicar_a_equipe():
+    """A TSB escova, mas a população é da equipe do dentista: somar a
+    técnica no denominador contaria a mesma equipe duas vezes."""
+    ind = _ind(funcao=["dentista", "tecnico"])
+    prod = pd.concat([
+        _prod([("01.01.02.003-1", 30)]),
+        _prod([("01.01.02.003-1", 33)]).assign(profissional="B"),
+    ])
+    assert metas.calcular(ind, prod)["B4"] == 10.0   # 63 ÷ (630 × 1)
+
+
+def test_b4_num_recorte_so_de_tecnicas_usa_a_equipe_de_cada_uma():
+    ind = _ind(funcao=["tecnico", "tecnico"])
+    v = metas.calcular(ind, _prod([("01.01.02.003-1", 126)]))
+    assert v["B4"] == 10.0
 
 
 def test_b1_ignora_as_observacoes_da_tecnica():

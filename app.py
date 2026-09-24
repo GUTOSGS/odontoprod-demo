@@ -284,7 +284,9 @@ with aba_metas:
         f"profissional — o valor oficial é apurado no SIAPS por equipe "
         f"(INE), com os códigos elegíveis de cada nota. B1 usa a população "
         f"de referência de {metas.POPULACAO_POR_DENTISTA:,} pessoas por "
-        f"cirurgião-dentista, pactuada pela coordenação."
+        f"cirurgião-dentista, pactuada pela coordenação, e B4 as "
+        f"{metas.CRIANCAS_POR_DENTISTA} crianças de 6 a 12 anos estimadas "
+        f"nessa população ({metas.PROPORCAO_6_A_12_ANOS:.0%})."
         .replace(",", "."))
     ministeriais = metas.aplicaveis(metas.MINISTERIAIS, funcoes)
     colunas = st.columns(3)

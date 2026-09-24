@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 OdontoProd — Metas de 2026 para os velocímetros do painel.
 
@@ -15,11 +15,13 @@ Regras de cálculo adotadas (as do próprio documento):
   * denominador zero -> "não calculável" (None).
 
 Limites que o painel precisa declarar:
-  * B4 depende das crianças de 6 a 12 anos vinculadas (SIAPS/SCNES): não
-    calculável a partir das planilhas;
   * B1 usa a população de referência pactuada pela coordenação em
     23/09/2026 — POPULACAO_POR_DENTISTA, abaixo — e não o cadastro do
     SIAPS;
+  * B4 usa, pelo mesmo critério, as crianças de 6 a 12 anos estimadas em
+    18% dessa população (pactuado em 24/09/2026) — CRIANCAS_POR_DENTISTA;
+    o numerador conta todos os participantes da escovação registrada,
+    porque a planilha não informa a idade;
   * B2, B3, B5 e B6 aqui são APROXIMAÇÕES por profissional, com os códigos
     SIGTAP das planilhas locais; o valor oficial é apurado no SIAPS por
     equipe (INE), com os códigos elegíveis da nota.
@@ -52,6 +54,11 @@ COD_PROFILAXIA = "03.07.03.004-0"          # 03.07, mas é preventivo
 # população vinculada a cada cirurgião-dentista, para o denominador de B1
 # (pactuado com a coordenação em 23/09/2026)
 POPULACAO_POR_DENTISTA = 3500
+# crianças de 6 a 12 anos nessa população, para o denominador de B4
+# (18%, pactuado com a coordenação em 24/09/2026)
+PROPORCAO_6_A_12_ANOS = 0.18
+CRIANCAS_POR_DENTISTA = round(POPULACAO_POR_DENTISTA * PROPORCAO_6_A_12_ANOS)
+COD_ESCOVACAO = "01.01.02.003-1"   # ação coletiva de escovação supervisionada
 
 # a que função cada indicador se aplica: a TSB não faz exodontia,
 # restauração, tratamento concluído nem atendimento de urgência — medir
@@ -73,6 +80,16 @@ def _faixa_b1(v):
     if v > 1.25:
         return OTIMO
     if v > 0.75:
+        return BOM
+    if v > 0.25:
+        return SUFICIENTE
+    return REGULAR
+
+
+def _faixa_b4(v):
+    if v > 1:
+        return OTIMO
+    if v > 0.5:
         return BOM
     if v > 0.25:
         return SUFICIENTE
@@ -143,8 +160,18 @@ MINISTERIAIS = [
      "formula": "exodontias ÷ (preventivos individuais + curativos + "
                 "exodontias)"},
     {"codigo": "B4", "nome": "Escovação supervisionada",
-     "calculavel": False, "funcoes": AMBOS, "otima": "> 1%",
-     "motivo": "denominador são as crianças de 6 a 12 anos vinculadas (SIAPS)"},
+     "calculavel": True, "funcoes": AMBOS, "otima": "> 1%",
+     "faixa": _faixa_b4, "eixo": 2,
+     "passos": [(0, 0.25, REGULAR), (0.25, 0.5, SUFICIENTE),
+                (0.5, 1, BOM), (1, 2, OTIMO)],
+     "formula": (f"participantes da escovação supervisionada no mês ÷ "
+                 f"{CRIANCAS_POR_DENTISTA} crianças de 6 a 12 anos por "
+                 f"equipe ({PROPORCAO_6_A_12_ANOS:.0%} de "
+                 f"{POPULACAO_POR_DENTISTA} pessoas) × 100. A equipe é "
+                 f"contada pelos cirurgiões-dentistas do recorte; num "
+                 f"recorte só de técnicas, por técnica. A planilha não "
+                 f"informa idade, então o numerador inclui todos os "
+                 f"participantes")},
     {"codigo": "B5", "nome": "Preventivos individuais", "calculavel": True,
      "funcoes": AMBOS, "otima": "≥ 65% e ≤ 85%", "faixa": _faixa_b5, "eixo": 100,
      "passos": [(0, 40, REGULAR), (40, 55, SUFICIENTE), (55, 65, BOM),
@@ -273,13 +300,19 @@ def calcular(ind: pd.DataFrame, prod: pd.DataFrame) -> dict:
     rest = q[cod.isin(COD_RESTAURACOES)].sum()
     base_individual = prev_ind + curativos + exo
 
-    # B1 é mensal: o denominador é a população de referência multiplicada
-    # pelas observações profissional × competência do recorte
+    # B1 e B4 são mensais: o denominador é a população de referência
+    # multiplicada pelas observações profissional × competência do recorte
     cd = ind[ind["funcao"] == CD] if "funcao" in ind else ind
+    # B4 é da equipe (CD e TSB fazem escovação): a população pertence ao
+    # dentista, para não contar a mesma equipe duas vezes; sem dentista no
+    # recorte, cada técnica responde pela população da sua equipe
+    equipes_mes = len(cd) if len(cd) else len(ind)
+    escovacao = q[cod == COD_ESCOVACAO].sum()
 
     return {
         "B1": _razao(cd["primeiras_consultas"].sum(),
                      POPULACAO_POR_DENTISTA * len(cd), 100),
+        "B4": _razao(escovacao, CRIANCAS_POR_DENTISTA * equipes_mes, 100),
         "B2": _razao(ind["trat_completados"].sum(),
                      ind["primeiras_consultas"].sum(), 100),
         "B3": _razao(exo, base_individual, 100),
