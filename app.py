@@ -279,15 +279,15 @@ with aba_metas:
     valores = metas.calcular(f_m, fp_m)
 
     st.markdown("#### Indicadores ministeriais (B1-B6)")
+    populacao = kpi_fmt(metas.POPULACAO_POR_DENTISTA, 0)   # 3.500
     st.caption(
         f"São **aproximações** a partir das planilhas locais, por "
         f"profissional — o valor oficial é apurado no SIAPS por equipe "
         f"(INE), com os códigos elegíveis de cada nota. B1 usa a população "
-        f"de referência de {metas.POPULACAO_POR_DENTISTA:,} pessoas por "
-        f"cirurgião-dentista, pactuada pela coordenação, e B4 as "
+        f"de referência de {populacao} pessoas por cirurgião-dentista, "
+        f"pactuada pela coordenação, e B4 as "
         f"{metas.CRIANCAS_POR_DENTISTA} crianças de 6 a 12 anos estimadas "
-        f"nessa população ({metas.PROPORCAO_6_A_12_ANOS:.0%})."
-        .replace(",", "."))
+        f"nessa população ({metas.PROPORCAO_6_A_12_ANOS:.0%}).")
     ministeriais = metas.aplicaveis(metas.MINISTERIAIS, funcoes)
     colunas = st.columns(3)
     for i, spec in enumerate(ministeriais):
