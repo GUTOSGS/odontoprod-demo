@@ -4,3 +4,7 @@
 .streamlit/
 __pycache__/
 *.pyc
+
+# atalho temporário do capturar_prints.py (abre o painel sem login) —
+# existe só durante a captura e nunca pode ir para o repositório
+_prints_app.py
