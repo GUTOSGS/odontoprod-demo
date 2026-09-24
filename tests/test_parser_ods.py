@@ -161,10 +161,10 @@ def test_mes_no_campo_de_unidade_nao_vira_unidade(tmp_path):
     até o modelo dimensional."""
     pasta = tmp_path / "PRODUÇÃO MENSAL 2022" / "12 DEZEMBRO"
     pasta.mkdir(parents=True)
-    arquivo = pasta / "Talita.xlsx"
+    arquivo = pasta / "Ciclana.xlsx"
     pd.DataFrame([
         ["MÊS: DEZEMBRO", None, None, None, None],
-        ["UNIDADE DE SAÚDE: DEZEMBRO   DENTISTA: TALITA", None, None, None, None],
+        ["UNIDADE DE SAÚDE: DEZEMBRO   DENTISTA: CICLANA", None, None, None, None],
         ["PRODUÇÃO ODONTOLOGIA", 1, 2, 3, "TOTAL"],
         ["03.01.01.015-3 - PRIMEIRA CONSULTA", 2, 1, 4, 7],
     ]).to_excel(arquivo, header=False, index=False)
@@ -174,7 +174,7 @@ def test_mes_no_campo_de_unidade_nao_vira_unidade(tmp_path):
     assert res.unidade == ""                       # não aceita o mês
     assert any("Unidade descartada" in a and "Dezembro" in a
                for a in res.avisos)                # e avisa, em vez de calar
-    assert res.profissional == "Talita"            # o resto segue normal
+    assert res.profissional == "Ciclana"            # o resto segue normal
     assert res.mes == 12
     assert not res.dados.empty
 
