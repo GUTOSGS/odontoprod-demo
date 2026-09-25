@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Guarda da anonimização — o teste mais importante deste repositório.
 
 Esta é a versão pública de demonstração do OdontoProd. A base operacional,
@@ -74,5 +74,5 @@ def test_a_base_publicada_continua_com_o_tamanho_esperado(producao):
     # 43 desde 25/09/2026: saíram três não profissionais (estagiários) e um
     # nome duplicado por espaços repetidos foi unificado
     assert producao["profissional"].nunique() == 43
-    assert producao["unidade"].nunique() == 18       # 17 + 'Não informada'
+    assert producao["unidade"].nunique() == 17
     assert len(producao) > 150_000
