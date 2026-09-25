@@ -28,10 +28,10 @@ monitoramento contínuo por profissional e competência.
 | | |
 |---|---|
 | Período | janeiro/2022 a junho/2026 (49 competências) |
-| Lançamentos diários | 190.447 |
-| Procedimentos | 528.409 |
-| Profissionais / unidades | 47 / 88 |
-| Observações profissional × mês | 1.089, com 21 indicadores cada |
+| Lançamentos diários | 189.817 |
+| Procedimentos | 527.378 |
+| Profissionais / unidades | 43 / 17 |
+| Observações profissional × mês | 1.080, com 21 indicadores cada |
 
 ## Como funciona
 

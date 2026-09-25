@@ -19,7 +19,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 DADOS = RAIZ / "dados"
 
 ROTULO_PROFISSIONAL = re.compile(r"^Profissional \d{2,}$")
-ROTULO_UNIDADE = re.compile(r"^(Unidade \d{2,})?$")   # vazio é aceito
+# vazio e 'Não informada' (planilha sem unidade) são aceitos
+ROTULO_UNIDADE = re.compile(r"^(Unidade \d{2,}|Não informada)?$")
 
 # arquivos que só existem no ambiente local e nunca podem chegar aqui
 ARQUIVOS_PROIBIDOS = [
@@ -70,5 +71,8 @@ def test_nenhuma_coluna_carrega_o_nome_original(producao, indicadores):
 def test_a_base_publicada_continua_com_o_tamanho_esperado(producao):
     """Sanidade: se este número despencar, alguém publicou um recorte errado;
     se explodir, pode ter vindo base que não é a anonimizada."""
-    assert producao["profissional"].nunique() == 47
+    # 43 desde 25/09/2026: saíram três não profissionais (estagiários) e um
+    # nome duplicado por espaços repetidos foi unificado
+    assert producao["profissional"].nunique() == 43
+    assert producao["unidade"].nunique() == 18       # 17 + 'Não informada'
     assert len(producao) > 150_000
