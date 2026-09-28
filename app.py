@@ -215,15 +215,27 @@ with aba1:
                           margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("##### Heatmap — atendimentos/dia por profissional × competência")
-    hm = f.pivot_table(index="profissional", columns="competencia",
-                       values="media_atend_dia", aggfunc="mean")
-    hm = hm.reindex(hm.mean(axis=1).sort_values(ascending=False).index)
-    fig = px.imshow(hm, aspect="auto", color_continuous_scale="Blues",
-                    labels=dict(color="Atend/dia"))
-    fig.update_layout(height=max(350, 22 * len(hm)), xaxis_title=None,
-                      yaxis_title=None, margin=dict(t=10, b=10))
+    # Matriz de envio: a cor responde só "tem planilha neste mês?". O mapa
+    # de calor de desempenho que havia aqui pedia comparar tons entre 37
+    # linhas e 54 colunas; comparação de valores fica com o boxplot (aba
+    # Comparativo), que usa posição, canal mais preciso que a cor.
+    st.markdown("##### Envio de planilhas — profissional × competência")
+    presenca = (f.assign(enviou=1)
+                .pivot_table(index="profissional", columns="competencia",
+                             values="enviou", aggfunc="max", fill_value=0))
+    primeira = presenca.idxmax(axis=1)
+    presenca = presenca.loc[primeira.sort_values().index]
+    fig = px.imshow(presenca, aspect="auto", zmin=0, zmax=1,
+                    color_continuous_scale=[[0, "#f2f2f2"], [1, AZUL]])
+    fig.update_traces(hovertemplate="%{y} · %{x}<extra></extra>")
+    fig.update_layout(height=max(350, 18 * len(presenca)), xaxis_title=None,
+                      yaxis_title=None, coloraxis_showscale=False,
+                      margin=dict(t=10, b=10))
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("Célula preenchida = há planilha do profissional na "
+               "competência. Lacunas no meio da linha indicam mês sem "
+               "registro; linhas que começam ou terminam no meio do período "
+               "indicam entrada ou saída da rede.")
 
 # ======================================================================
 # ABA METAS 2026 — VELOCÍMETROS
@@ -727,14 +739,21 @@ with aba3:
                    "razao_tc", "media_prev_dia", "pct_exodontias", "razao_rest_exo"]
     mat = f.groupby("profissional")[cols_matriz].mean()
     mat_norm = (mat - mat.min()) / (mat.max() - mat.min())
+    # verde sempre significa "melhor": nos indicadores em que menor é
+    # melhor, a escala é invertida (sem isso, absenteísmo alto saía verde)
+    for c in cols_matriz:
+        if c in MENOR_MELHOR:
+            mat_norm[c] = 1 - mat_norm[c]
     mat_norm.columns = [INDICADORES_ROTULOS[c] for c in cols_matriz]
     fig = px.imshow(mat_norm.T, aspect="auto", color_continuous_scale="RdYlGn",
-                    labels=dict(color="0–1"))
+                    zmin=0, zmax=1, labels=dict(color="0–1"))
     fig.update_layout(height=340, xaxis_title=None, yaxis_title=None,
                       margin=dict(t=10, b=10))
     st.plotly_chart(fig, use_container_width=True)
-    st.caption("Atenção: absenteísmo e % exodontias — quanto MAIOR, pior. "
-               "A normalização é apenas visual; consulte os valores brutos na aba Dados.")
+    st.caption("Verde = melhor posição na rede em cada indicador, já "
+               "considerando a direção (em absenteísmo e % exodontias, menor "
+               "é melhor). A escala é relativa ao grupo filtrado; os valores "
+               "brutos estão na aba Dados.")
 
 # ======================================================================
 # ABA 4 — INDICADORES CLÍNICOS
