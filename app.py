@@ -66,6 +66,21 @@ def carregar():
 
 
 ind, prod = carregar()
+
+
+@st.cache_data(show_spinner="Classificando a produção da rede…")
+def producao_da_rede(ini: str, fim: str) -> pd.DataFrame:
+    """Lançamentos do período classificados por grupo de procedimentos.
+
+    Em cache por período: o Streamlit reexecuta o script inteiro a cada
+    interação, inclusive o código das abas que não estão à vista, e esta
+    classificação percorre toda a base (segundos). Sem cache, qualquer
+    clique no painel a repetia. A atualização da base limpa o cache.
+    """
+    base = prod[(prod["competencia"] >= ini) & (prod["competencia"] <= fim)]
+    return aplicar_grupos(base)
+
+
 competencias = sorted(ind["competencia"].unique())
 
 MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun",
@@ -830,9 +845,7 @@ with aba_prod:
                "Consultas/agenda (sem código SIGTAP), preventivos e "
                "curativos são totalizados SEPARADAMENTE — nunca somados.")
 
-    base_rede = prod[(prod["competencia"] >= ini)
-                     & (prod["competencia"] <= fim)]
-    base_rede = aplicar_grupos(base_rede)
+    base_rede = producao_da_rede(ini, fim)
     grupos_presentes = [g for g in ORDEM_GRUPOS
                         if g in set(base_rede["grupo"])]
 
