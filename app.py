@@ -16,7 +16,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 from src.auth import barra_usuario, exigir_login
-from src.indicadores import metas
+from src.indicadores import marcos, metas
 from src.indicadores.grupos import ORDEM_GRUPOS, aplicar_grupos
 from src.indicadores.motor import calcular_serie
 from src.relatorios.avaliacao_pdf import gerar_pdf_avaliacao
@@ -166,6 +166,13 @@ with aba1:
     c5.metric("Exodontias (média %)", kpi_fmt(f["pct_exodontias"].mean(), 1, "%"))
     c6.metric("1ªs consultas (total)", kpi_fmt(f["primeiras_consultas"].sum(), 0))
 
+    st.caption(
+        f"Fonte: planilhas mensais de produção preenchidas pelos "
+        f"profissionais, com totais recalculados dos lançamentos diários · "
+        f"base disponível de {fmt_comp(competencias[0])} a "
+        f"{fmt_comp(competencias[-1])} · médias por profissional e "
+        f"competência.")
+
     st.divider()
     col_a, col_b = st.columns([3, 2])
 
@@ -185,6 +192,14 @@ with aba1:
         fig.add_scatter(x=serie["competencia"], y=serie["absent"],
                         name="Absenteísmo (%)", mode="lines",
                         line=dict(color="#c0504d", width=1.5, dash="dot"))
+        for marco in marcos.no_intervalo(ini, fim):
+            fig.add_shape(type="line", x0=marco["competencia"],
+                          x1=marco["competencia"], y0=0, y1=1, yref="paper",
+                          line=dict(color="#7f7f7f", width=1, dash="dash"))
+            fig.add_annotation(x=marco["competencia"], y=1, yref="paper",
+                               text=marco["rotulo"], showarrow=False,
+                               xanchor="left", yanchor="bottom",
+                               font=dict(size=11, color="#555555"))
         fig.update_layout(title="Evolução mensal — médias da rede",
                           height=380, legend=dict(orientation="h", y=-0.25),
                           margin=dict(t=50, b=10))

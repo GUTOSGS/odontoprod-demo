@@ -103,7 +103,7 @@ As senhas ficam guardadas em PBKDF2-SHA256 com sal por senha.
 
 ## Testes
 
-151 testes automatizados cobrem o motor de indicadores, as faixas das metas,
+154 testes automatizados cobrem o motor de indicadores, as faixas das metas,
 o classificador de grupos de produção, a autenticação, os dois leitores de
 planilha (incluindo planilha com defeito proposital: mês divergente, dia fora
 de sequência, total que não fecha e linha criada à mão) e a **anonimização
