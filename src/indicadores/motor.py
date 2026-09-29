@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Módulo 3: Motor de indicadores de produtividade e perfil
-assistencial, calculados por profissional × competência (mês).
+"""Indicadores de produtividade e perfil assistencial por profissional e
+competência (mês).
 
-Cada indicador é uma função pura sobre o subconjunto (grupo) de lançamentos
-de um profissional em uma competência. Adicionar um indicador novo =
-adicionar uma função e registrá-la em INDICADORES.
+Cada indicador é calculado sobre os lançamentos de um profissional em uma
+competência (`calcular_grupo`); para incluir um novo, basta acrescentá-lo
+ao dicionário devolvido por essa função.
 """
 
 import pandas as pd
 
-# ----------------------------------------------------------------------
-# Códigos SIGTAP usados nos indicadores
-# ----------------------------------------------------------------------
+# códigos SIGTAP usados nos indicadores
 COD_PRIMEIRA_CONSULTA = "03.01.01.015-3"
 COD_ART = "03.07.01.007-4"
 COD_URGENCIA = "03.01.06.003-7"
@@ -49,9 +45,7 @@ COD_PREVENTIVOS = {
 CHAVES_AGENDA_NAO_CLINICAS = {"agendados", "faltosos"}
 
 
-# ----------------------------------------------------------------------
-# Auxiliares sobre o grupo (lançamentos de 1 profissional × 1 competência)
-# ----------------------------------------------------------------------
+# auxiliares sobre o grupo (lançamentos de um profissional em um mês)
 def _proc(g: pd.DataFrame) -> pd.DataFrame:
     return g[g["categoria"] == "procedimento"]
 
@@ -81,9 +75,6 @@ def atendimentos(g: pd.DataFrame) -> float:
             + _soma_cod(g, COD_PRIMEIRA_CONSULTA) + _soma_cod(g, COD_URGENCIA))
 
 
-# ----------------------------------------------------------------------
-# Registro central: nome do indicador -> função(grupo) -> valor
-# ----------------------------------------------------------------------
 def _por_dia(valor: float, dias: int) -> float | None:
     return round(valor / dias, 2) if dias else None
 
@@ -130,6 +121,11 @@ def calcular_grupo(g: pd.DataFrame) -> dict:
     }
 
 
+def _mais_frequente(coluna: pd.Series) -> str:
+    moda = coluna.mode()
+    return moda.iat[0] if not moda.empty else ""
+
+
 def calcular_serie(dados: pd.DataFrame) -> pd.DataFrame:
     """Calcula a matriz de indicadores profissional × competência.
 
@@ -140,8 +136,8 @@ def calcular_serie(dados: pd.DataFrame) -> pd.DataFrame:
     for (prof, ano, mes), g in grupos:
         linha = {
             "profissional": prof,
-            "funcao": g["funcao"].mode().iat[0] if not g["funcao"].mode().empty else "",
-            "unidade": g["unidade"].mode().iat[0] if not g["unidade"].mode().empty else "",
+            "funcao": _mais_frequente(g["funcao"]),
+            "unidade": _mais_frequente(g["unidade"]),
             "ano": int(ano),
             "mes": int(mes),
             "competencia": f"{int(ano)}-{int(mes):02d}",

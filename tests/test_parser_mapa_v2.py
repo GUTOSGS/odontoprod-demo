@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes do roteamento e da leitura de competência do template v2
 (Mapa de Produção 2025+, src/ingestao/parser_mapa_v2.py).
 

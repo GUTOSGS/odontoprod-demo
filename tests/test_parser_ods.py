@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes do parser do template v1 (src/ingestao/parser_ods.py).
 
 Princípio do projeto que estes testes travam: o parser tolera planilha

@@ -1,39 +1,12 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Metas de 2026 para os velocímetros do painel.
+"""Metas de 2026: indicadores ministeriais B1-B6 e metas operacionais.
 
-Fonte: o resumo municipal de indicadores de saúde bucal para o planejamento
-2026 (coordenação municipal), que reúne:
+Os valores de um recorte somam numeradores e denominadores; percentuais
+com bases diferentes nunca são tirados por média. Denominador zero devolve
+None ("não calculável").
 
-  * os seis indicadores ministeriais B1-B6 (notas metodológicas do MS,
-    maio/2026), com faixas Ótimo/Bom/Suficiente/Regular;
-  * as sete metas operacionais da RASB do município.
-
-Regras de cálculo adotadas (as do próprio documento):
-  * agregar somando numeradores e denominadores — nunca média simples de
-    percentuais com bases diferentes;
-  * denominador zero -> "não calculável" (None).
-
-Limites que o painel precisa declarar:
-  * B1 usa a população de referência pactuada pela coordenação em
-    23/09/2026 — POPULACAO_POR_DENTISTA, abaixo — e não o cadastro do
-    SIAPS;
-  * B4 usa, pelo mesmo critério, as crianças de 6 a 12 anos estimadas em
-    18% dessa população (pactuado em 24/09/2026) — CRIANCAS_POR_DENTISTA;
-    o numerador conta todos os participantes da escovação registrada,
-    porque a planilha não informa a idade;
-  * B2, B3, B5 e B6 aqui são APROXIMAÇÕES por profissional, com os códigos
-    SIGTAP das planilhas locais; o valor oficial é apurado no SIAPS por
-    equipe (INE), com os códigos elegíveis da nota.
-
-Faixas das metas operacionais (definidas em 23/09/2026): o documento
-municipal passou a informar o sentido de cada meta ("quanto mais, melhor"
-ou "quanto menos, melhor") e a meta virou a fronteira do Ótimo. Abaixo
-dela, três degraus de mesmo tamanho (um terço da meta) reproduzem a escala
-ministerial: Ótimo, Bom, Suficiente e, no que sobra, Regular.
-
-População de referência de cada cirurgião-dentista (B1), e não a população
-do município: cada eSB acompanha uma população vinculada dessa ordem.
+B1 e B4 usam populações de referência pactuadas localmente, e não o
+cadastro do SIAPS. B2, B3, B5 e B6 são aproximações por profissional com
+os códigos SIGTAP das planilhas; o valor oficial é apurado por equipe.
 """
 
 import pandas as pd
@@ -41,34 +14,27 @@ import pandas as pd
 from src.indicadores.motor import (COD_ART, COD_EXODONTIAS, COD_PREVENTIVOS,
                                    COD_RESTAURACOES)
 
-# preventivos de natureza coletiva ficam fora de B3/B5 (a nota fala em
-# procedimentos INDIVIDUAIS)
+# B3 e B5 tratam de procedimentos individuais
 COD_PREVENTIVOS_COLETIVOS = {
     "01.01.02.001-5",  # flúor gel coletivo
     "01.01.02.002-3",  # bochecho fluorado
     "01.01.02.003-1",  # escovação supervisionada
 }
 COD_PREVENTIVOS_INDIVIDUAIS = COD_PREVENTIVOS - COD_PREVENTIVOS_COLETIVOS
-COD_PROFILAXIA = "03.07.03.004-0"          # 03.07, mas é preventivo
+COD_PROFILAXIA = "03.07.03.004-0"  # está no grupo 03.07, mas é preventivo
 
-# população vinculada a cada cirurgião-dentista, para o denominador de B1
-# (pactuado com a coordenação em 23/09/2026)
+# denominadores de B1 (pessoas vinculadas a cada cirurgião-dentista) e B4
+# (crianças de 6 a 12 anos nessa população)
 POPULACAO_POR_DENTISTA = 3500
-# crianças de 6 a 12 anos nessa população, para o denominador de B4
-# (18%, pactuado com a coordenação em 24/09/2026)
 PROPORCAO_6_A_12_ANOS = 0.18
 CRIANCAS_POR_DENTISTA = round(POPULACAO_POR_DENTISTA * PROPORCAO_6_A_12_ANOS)
-COD_ESCOVACAO = "01.01.02.003-1"   # ação coletiva de escovação supervisionada
+COD_ESCOVACAO = "01.01.02.003-1"
 
-# a que função cada indicador se aplica: a TSB não faz exodontia,
-# restauração, tratamento concluído nem atendimento de urgência — medir
-# isso nela só produziria zero
+# a técnica não faz exodontia, restauração, tratamento concluído nem
+# urgência; esses indicadores valem só para o cirurgião-dentista
 CD, TSB = "dentista", "tecnico"
 AMBOS = (CD, TSB)
 
-# ----------------------------------------------------------------------
-# Faixas ministeriais
-# ----------------------------------------------------------------------
 OTIMO, BOM, SUFICIENTE, REGULAR = "Ótimo", "Bom", "Suficiente", "Regular"
 SEM_FAIXA = "Sem faixa definida"
 
@@ -76,24 +42,20 @@ CORES = {OTIMO: "#2e8b6e", BOM: "#8cc152", SUFICIENTE: "#f0b429",
          REGULAR: "#c0504d", SEM_FAIXA: "#b0b0b0"}
 
 
-def _faixa_b1(v):
-    if v > 1.25:
-        return OTIMO
-    if v > 0.75:
-        return BOM
-    if v > 0.25:
-        return SUFICIENTE
-    return REGULAR
+def _acima_de(otimo, bom, suficiente):
+    """Faixas em que o valor precisa superar cada limite."""
+    def faixa(v):
+        for limite, nome in ((otimo, OTIMO), (bom, BOM),
+                             (suficiente, SUFICIENTE)):
+            if v > limite:
+                return nome
+        return REGULAR
+    return faixa
 
 
-def _faixa_b4(v):
-    if v > 1:
-        return OTIMO
-    if v > 0.5:
-        return BOM
-    if v > 0.25:
-        return SUFICIENTE
-    return REGULAR
+_faixa_b1 = _acima_de(1.25, 0.75, 0.25)
+_faixa_b4 = _acima_de(1, 0.5, 0.25)
+_faixa_b6 = _acima_de(8, 6, 3)
 
 
 def _faixa_b2(v):
@@ -128,40 +90,30 @@ def _faixa_b5(v):
     return REGULAR            # > 85% também é regular na ficha
 
 
-def _faixa_b6(v):
-    if v > 8:
-        return OTIMO
-    if v > 6:
-        return BOM
-    if v > 3:
-        return SUFICIENTE
-    return REGULAR
-
-
 MINISTERIAIS = [
     {"codigo": "B1", "nome": "Primeira consulta programada",
-     "calculavel": True, "funcoes": (CD,),
-     "otima": "> 1,25%", "faixa": _faixa_b1, "eixo": 2,
+     "funcoes": (CD,), "otima": "> 1,25%", "faixa": _faixa_b1, "eixo": 2,
      "passos": [(0, 0.25, REGULAR), (0.25, 0.75, SUFICIENTE),
                 (0.75, 1.25, BOM), (1.25, 2, OTIMO)],
      "formula": (f"primeiras consultas programáticas no mês ÷ "
                  f"{POPULACAO_POR_DENTISTA} pessoas por cirurgião-dentista "
                  f"× 100 (população de referência pactuada, não o cadastro "
                  f"do SIAPS)")},
-    {"codigo": "B2", "nome": "Tratamento concluído", "calculavel": True,
-     "funcoes": (CD,), "otima": "> 75% e ≤ 100%", "faixa": _faixa_b2, "eixo": 120,
+    {"codigo": "B2", "nome": "Tratamento concluído",
+     "funcoes": (CD,), "otima": "> 75% e ≤ 100%", "faixa": _faixa_b2,
+     "eixo": 120,
      "passos": [(0, 25, REGULAR), (25, 50, SUFICIENTE), (50, 75, BOM),
                 (75, 100, OTIMO), (100, 120, SEM_FAIXA)],
      "formula": "tratamentos concluídos ÷ primeiras consultas programáticas"},
-    {"codigo": "B3", "nome": "Taxa de exodontia", "calculavel": True,
-     "funcoes": (CD,), "otima": "≥ 3% e < 10%", "faixa": _faixa_b3, "eixo": 20,
+    {"codigo": "B3", "nome": "Taxa de exodontia",
+     "funcoes": (CD,), "otima": "≥ 3% e < 10%", "faixa": _faixa_b3,
+     "eixo": 20,
      "passos": [(0, 3, REGULAR), (3, 10, OTIMO), (10, 12, BOM),
                 (12, 14, SUFICIENTE), (14, 20, REGULAR)],
      "formula": "exodontias ÷ (preventivos individuais + curativos + "
                 "exodontias)"},
     {"codigo": "B4", "nome": "Escovação supervisionada",
-     "calculavel": True, "funcoes": AMBOS, "otima": "> 1%",
-     "faixa": _faixa_b4, "eixo": 2,
+     "funcoes": AMBOS, "otima": "> 1%", "faixa": _faixa_b4, "eixo": 2,
      "passos": [(0, 0.25, REGULAR), (0.25, 0.5, SUFICIENTE),
                 (0.5, 1, BOM), (1, 2, OTIMO)],
      "formula": (f"participantes da escovação supervisionada no mês ÷ "
@@ -172,51 +124,46 @@ MINISTERIAIS = [
                  f"recorte só de técnicas, por técnica. A planilha não "
                  f"informa idade, então o numerador inclui todos os "
                  f"participantes")},
-    {"codigo": "B5", "nome": "Preventivos individuais", "calculavel": True,
-     "funcoes": AMBOS, "otima": "≥ 65% e ≤ 85%", "faixa": _faixa_b5, "eixo": 100,
+    {"codigo": "B5", "nome": "Preventivos individuais",
+     "funcoes": AMBOS, "otima": "≥ 65% e ≤ 85%", "faixa": _faixa_b5,
+     "eixo": 100,
      "passos": [(0, 40, REGULAR), (40, 55, SUFICIENTE), (55, 65, BOM),
                 (65, 85, OTIMO), (85, 100, REGULAR)],
      "formula": "preventivos individuais ÷ (preventivos individuais + "
                 "curativos + exodontias)"},
     {"codigo": "B6", "nome": "Tratamento restaurador atraumático (ART)",
-     "calculavel": True, "funcoes": (CD,), "otima": "> 8%", "faixa": _faixa_b6, "eixo": 15,
+     "funcoes": (CD,), "otima": "> 8%", "faixa": _faixa_b6, "eixo": 15,
      "passos": [(0, 3, REGULAR), (3, 6, SUFICIENTE), (6, 8, BOM),
                 (8, 15, OTIMO)],
      "formula": "ART ÷ (restaurações + ART)"},
 ]
 
-# ----------------------------------------------------------------------
-# Metas operacionais da RASB do município
-# sentido: "minimo" (quanto mais, melhor) ou "teto" (quanto menos, melhor),
-# como o documento municipal passou a declarar em 23/09/2026
-# ----------------------------------------------------------------------
+# sentido: "minimo" (quanto mais, melhor) ou "teto" (quanto menos, melhor)
 OPERACIONAIS = [
     {"codigo": "O1", "nome": "Agendamentos por dia", "meta": 8,
      "sentido": "minimo", "unidade": "", "casas": 1, "funcoes": AMBOS,
      "formula": "agendados ÷ dias trabalhados (competências com agenda)"},
-    {"codigo": "O3", "nome": "Faltas (% dos agendados)", "meta": 10,
+    {"codigo": "O2", "nome": "Faltas (% dos agendados)", "meta": 10,
      "sentido": "teto", "unidade": "%", "casas": 1, "funcoes": AMBOS,
      "formula": "faltosos ÷ agendados × 100"},
-    {"codigo": "O4", "nome": "Dias trabalhados por mês", "meta": 17,
+    {"codigo": "O3", "nome": "Dias trabalhados por mês", "meta": 17,
      "sentido": "minimo", "unidade": "", "casas": 1, "funcoes": AMBOS,
      "formula": "soma dos dias trabalhados ÷ profissionais × meses"},
-    {"codigo": "O5", "nome": "Urgências por dia", "meta": 2,
+    {"codigo": "O4", "nome": "Urgências por dia", "meta": 2,
      "sentido": "teto", "unidade": "", "casas": 2, "funcoes": (CD,),
      "formula": "urgências ÷ dias trabalhados"},
-    {"codigo": "O6", "nome": "Urgências (% das consultas)", "meta": 20,
+    {"codigo": "O5", "nome": "Urgências (% das consultas)", "meta": 20,
      "sentido": "teto", "unidade": "%", "casas": 1, "funcoes": (CD,),
      "formula": "urgências ÷ atendimentos × 100"},
-    {"codigo": "O7", "nome": "Consultas por tratamento completado",
+    {"codigo": "O6", "nome": "Consultas por tratamento completado",
      "meta": 5, "sentido": "teto", "unidade": "", "casas": 1,
      "funcoes": (CD,),
      "formula": "(atendimentos − urgências) ÷ tratamentos completados — "
                 "aproximação: a planilha não identifica o episódio"},
 ]
 
-# ----------------------------------------------------------------------
-# Faixas das metas operacionais: a meta é a fronteira do Ótimo e abaixo
-# dela vêm três degraus de um terço da meta, no formato das faixas do MS
-# ----------------------------------------------------------------------
+# a meta é a fronteira do Ótimo; abaixo dela, três degraus de um terço da
+# meta formam Bom, Suficiente e Regular, como nas faixas ministeriais
 DEGRAUS = 3
 
 
@@ -300,12 +247,10 @@ def calcular(ind: pd.DataFrame, prod: pd.DataFrame) -> dict:
     rest = q[cod.isin(COD_RESTAURACOES)].sum()
     base_individual = prev_ind + curativos + exo
 
-    # B1 e B4 são mensais: o denominador é a população de referência
-    # multiplicada pelas observações profissional × competência do recorte
+    # B1 e B4 são mensais: população de referência × observações do recorte.
+    # A população de B4 é contada pelo dentista, para não contar a mesma
+    # equipe duas vezes; num recorte só de técnicas, conta-se cada uma.
     cd = ind[ind["funcao"] == CD] if "funcao" in ind else ind
-    # B4 é da equipe (CD e TSB fazem escovação): a população pertence ao
-    # dentista, para não contar a mesma equipe duas vezes; sem dentista no
-    # recorte, cada técnica responde pela população da sua equipe
     equipes_mes = len(cd) if len(cd) else len(ind)
     escovacao = q[cod == COD_ESCOVACAO].sum()
 
@@ -319,12 +264,12 @@ def calcular(ind: pd.DataFrame, prod: pd.DataFrame) -> dict:
         "B5": _razao(prev_ind, base_individual, 100),
         "B6": _razao(art, rest + art, 100),
         "O1": _razao(com_agenda["agendados"].sum(), dias_ag),
-        "O3": _razao(com_agenda["faltosos"].sum(),
+        "O2": _razao(com_agenda["faltosos"].sum(),
                      com_agenda["agendados"].sum(), 100),
-        "O4": _razao(dias, len(ind)),
-        "O5": _razao(urg, dias),
-        "O6": _razao(urg, atend, 100),
-        "O7": _razao(atend - urg, ind["trat_completados"].sum()),
+        "O3": _razao(dias, len(ind)),
+        "O4": _razao(urg, dias),
+        "O5": _razao(urg, atend, 100),
+        "O6": _razao(atend - urg, ind["trat_completados"].sum()),
     }
 
 

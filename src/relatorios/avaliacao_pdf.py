@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Relatório PDF de Avaliação Individual do profissional.
+"""Relatório PDF de Avaliação Individual do profissional.
 
 Gera um PDF multipáginas (A4) com cabeçalho, tabela-síntese com percentis,
 radar de posição relativa, destaques e gráficos de evolução mensal com a
@@ -97,7 +95,7 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
                            else VERMELHO if "abaixo" in texto else AMARELO)
                     cel.set_text_props(color=cor, fontweight="bold")
             fig.text(0.08, 0.045,
-                     "↓ = indicador em que valor MENOR é melhor; a Situação e o radar "
+                     "↓ = indicador em que o valor menor é o melhor; a Situação e o radar "
                      "já consideram a direção. Percentil sobre a média de cada "
                      "profissional no período.",
                      fontsize=7, color=CINZA)

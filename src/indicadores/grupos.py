@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Classificação dos lançamentos em grupos de produção.
+"""Classificação dos lançamentos em grupos de produção.
 
 Regra central: consultas/agenda (sem código SIGTAP) e procedimentos
-preventivos NUNCA são somados com procedimentos curativos/cirúrgicos.
+preventivos nunca são somados com procedimentos curativos/cirúrgicos.
 A classificação usa o prefixo do código SIGTAP (grupo da tabela SUS):
   01 = ações de promoção e prevenção      02 = diagnóstico
   03.01 = consultas/atendimentos          03.07 = clínicos (dentística,

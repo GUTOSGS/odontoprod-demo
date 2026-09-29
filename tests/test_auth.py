@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes da verificação de senha (src/auth.py).
 
 Não testam a tela de login (isso é Streamlit): testam a regra que decide se

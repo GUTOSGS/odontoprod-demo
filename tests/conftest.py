@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Configuração comum dos testes: torna o projeto importável e cria fixtures."""
 import sys
 from pathlib import Path

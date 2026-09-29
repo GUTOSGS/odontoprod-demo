@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Parser do template v2 (2025+): "MAPA DE PRODUÇÃO ODONTOLÓGICA".
+"""Parser do template v2 (2025+): "MAPA DE PRODUÇÃO ODONTOLÓGICA".
 
 Diferenças em relação ao template v1 (2022-2024, ver parser_ods.py):
   - Pasta de trabalho com abas nomeadas: 'CIRURGIÃO-DENTISTA' e
@@ -323,12 +321,10 @@ def eh_aba_generica(nome_aba: str) -> bool:
 def resolver_conflitos_abas(resultados: list) -> list:
     """Decide entre aba genérica e aba nomeada quando disputam o mesmo mês.
 
-    Contexto (achado de 21/09/2026): profissionais mantêm uma planilha
-    cumulativa e salvam uma cópia por mês. Nela convivem a aba genérica —
-    que não tem mês no nome e herda o mês da PASTA — e as abas nomeadas
-    ('ABRIL 2025'). A regra antiga do lote ficava com a MAIOR das duas, e
-    escolheu a genérica em 36 de 52 conflitos; em ao menos um caso
-    comprovado a genérica era cópia velha de outro mês.
+    Há profissionais que mantêm uma planilha cumulativa e salvam uma cópia
+    por mês. Nela convivem a aba genérica, sem mês no nome (herda o mês da
+    pasta), e as abas nomeadas ('ABRIL 2025'); a genérica costuma ser cópia
+    de outro mês, por isso a nomeada tem precedência.
 
     Regra:
       1. a aba nomeada vale para o mês que o nome dela declara;

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes dos marcos da série (src/indicadores/marcos.py)."""
 import re
 

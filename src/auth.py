@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Autenticação por perfil (admin / gestor / profissional).
+"""Autenticação por perfil (admin / gestor / profissional).
 
 Credenciais em .streamlit/secrets.toml (fora do código e fora de
 versionamento). Perfis:

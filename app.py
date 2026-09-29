@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Painel de Produtividade em Saúde Bucal (APS)
+"""Painel de Produtividade em Saúde Bucal (APS)
 TCC MBA Data Science & Analytics — USP/Esalq
 
 Executar:  streamlit run app.py
 """
 
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -32,10 +31,9 @@ st.set_page_config(
     layout="wide",
 )
 
-sessao = exigir_login()
+exigir_login()
 
 AZUL = "#1f3864"
-PALETA = px.colors.qualitative.Set2
 
 INDICADORES_ROTULOS = {
     "media_atend_dia": "Atendimentos/dia",
@@ -55,7 +53,6 @@ INDICADORES_ROTULOS = {
 }
 
 
-# ----------------------------------------------------------------------
 @st.cache_data
 def carregar():
     ind = pd.read_parquet(DADOS / "indicadores_mensais.parquet")
@@ -72,10 +69,9 @@ ind, prod = carregar()
 def producao_da_rede(ini: str, fim: str) -> pd.DataFrame:
     """Lançamentos do período classificados por grupo de procedimentos.
 
-    Em cache por período: o Streamlit reexecuta o script inteiro a cada
-    interação, inclusive o código das abas que não estão à vista, e esta
-    classificação percorre toda a base (segundos). Sem cache, qualquer
-    clique no painel a repetia. A atualização da base limpa o cache.
+    Fica em cache porque o Streamlit reexecuta o script a cada interação,
+    inclusive nas abas fora de vista, e a classificação percorre a base
+    inteira.
     """
     base = prod[(prod["competencia"] >= ini) & (prod["competencia"] <= fim)]
     return aplicar_grupos(base)
@@ -92,9 +88,19 @@ def fmt_comp(c: str) -> str:
     return f"{MESES_ABREV[int(mes) - 1]}/{ano}"
 
 
-# ----------------------------------------------------------------------
+def inteiro(v) -> str:
+    return f"{int(v):,}".replace(",", ".")
+
+
+def kpi_fmt(v, casas=1, sufixo=""):
+    if v is None or pd.isna(v):
+        return "—"
+    return f"{v:,.{casas}f}{sufixo}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+# ======================================================================
 # Barra lateral: filtros globais
-# ----------------------------------------------------------------------
+# ======================================================================
 st.sidebar.title("🦷 OdontoProd")
 st.sidebar.caption("Demonstração pública — **dados anonimizados** · TCC MBA DSA USP/Esalq")
 
@@ -137,7 +143,7 @@ st.sidebar.divider()
 st.sidebar.caption(
     f"**{f['profissional'].nunique()}** profissionais · "
     f"**{f['competencia'].nunique()}** competências · "
-    f"**{int(f['total_procedimentos'].sum()):,}** procedimentos".replace(",", ".")
+    f"**{inteiro(f['total_procedimentos'].sum())}** procedimentos"
 )
 barra_usuario()
 
@@ -148,29 +154,20 @@ if f.empty:
                "filtro de função está em 'Técnico', e vice-versa.")
     st.stop()
 
-# ----------------------------------------------------------------------
-titulo_abas = ["📊 Visão Geral", "⏱️ Metas 2026",
-               "👤 Produtividade Individual",
-               "🎯 Avaliação Individual", "⚖️ Comparativo",
-               "🩺 Indicadores Clínicos", "📋 Produção da Rede",
-               "📁 Dados & Exportação"]
-(aba1, aba_metas, aba2, aba_av, aba3, aba4, aba_prod,
- aba5) = st.tabs(titulo_abas)
+(aba_visao, aba_metas, aba_produtividade, aba_avaliacao, aba_comparativo,
+ aba_clinicos, aba_producao, aba_dados) = st.tabs([
+    "📊 Visão Geral", "⏱️ Metas 2026", "👤 Produtividade Individual",
+    "🎯 Avaliação Individual", "⚖️ Comparativo", "🩺 Indicadores Clínicos",
+    "📋 Produção da Rede", "📁 Dados & Exportação"])
 
-# indicadores em que valor MENOR é melhor (inverte leitura do percentil)
+# indicadores em que o valor menor é o melhor (inverte a leitura do percentil)
 MENOR_MELHOR = {"taxa_absenteismo_pct", "media_faltas_dia", "pct_exodontias"}
 
 
-def kpi_fmt(v, casas=1, sufixo=""):
-    if v is None or pd.isna(v):
-        return "—"
-    return f"{v:,.{casas}f}{sufixo}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
 # ======================================================================
-# ABA 1 — VISÃO GERAL
+# Visão geral
 # ======================================================================
-with aba1:
+with aba_visao:
     st.subheader("Visão geral da rede no período")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -230,10 +227,8 @@ with aba1:
                           margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
-    # Matriz de envio: a cor responde só "tem planilha neste mês?". O mapa
-    # de calor de desempenho que havia aqui pedia comparar tons entre 37
-    # linhas e 54 colunas; comparação de valores fica com o boxplot (aba
-    # Comparativo), que usa posição, canal mais preciso que a cor.
+    # a cor responde só se há planilha no mês; comparar valores fica com o
+    # boxplot do Comparativo, porque posição se lê melhor que tom de cor
     st.markdown("##### Envio de planilhas — profissional × competência")
     presenca = (f.assign(enviou=1)
                 .pivot_table(index="profissional", columns="competencia",
@@ -253,7 +248,7 @@ with aba1:
                "indicam entrada ou saída da rede.")
 
 # ======================================================================
-# ABA METAS 2026 — VELOCÍMETROS
+# Metas 2026
 # ======================================================================
 
 
@@ -335,11 +330,6 @@ with aba_metas:
     for i, spec in enumerate(ministeriais):
         with colunas[i % 3]:
             titulo = f"{spec['codigo']} · {spec['nome']}"
-            if not spec["calculavel"]:
-                st.markdown(f"**{titulo}**")
-                st.info(f"Não calculável pelas planilhas: {spec['motivo']}. "
-                        f"Faixa ótima: {spec['otima']}.")
-                continue
             v = valores[spec["codigo"]]
             if v is None:
                 st.markdown(f"**{titulo}**")
@@ -399,11 +389,9 @@ with aba_metas:
         tab = metas.por_profissional(f, fp)
         exibe = pd.DataFrame({"Profissional": tab["profissional"]})
         for spec in ministeriais:
-            if spec["calculavel"]:
-                exibe[spec["codigo"]] = [
-                    "—" if pd.isna(v) else
-                    f"{kpi_fmt(v, 1)}% · {spec['faixa'](v)}"
-                    for v in tab[spec["codigo"]]]
+            exibe[spec["codigo"]] = [
+                "—" if pd.isna(v) else f"{kpi_fmt(v, 1)}% · {spec['faixa'](v)}"
+                for v in tab[spec["codigo"]]]
         for spec in operacionais:
             exibe[spec["nome"]] = [
                 "—" if pd.isna(v) else
@@ -418,8 +406,7 @@ with aba_metas:
     with st.expander("Como cada valor é calculado"):
         for spec in ministeriais + operacionais:
             nome = f"**{spec['codigo']} · {spec['nome']}**"
-            st.markdown(f"- {nome}: " + spec.get(
-                "formula", f"não calculável — {spec.get('motivo', '')}"))
+            st.markdown(f"- {nome}: {spec['formula']}")
         st.markdown(
             "- Agendamentos e faltas usam só as competências em que o "
             "profissional registrou agendados — quem não preenche o campo "
@@ -429,9 +416,9 @@ with aba_metas:
             "procedimentos individuais.")
 
 # ======================================================================
-# ABA 2 — PRODUTIVIDADE INDIVIDUAL
+# Produtividade individual
 # ======================================================================
-with aba2:
+with aba_produtividade:
     prof = st.selectbox("Profissional",
                         sorted(f["profissional"].unique()))
     g = f[f["profissional"] == prof].sort_values("competencia")
@@ -487,9 +474,9 @@ with aba2:
         st.plotly_chart(fig, use_container_width=True)
 
 # ======================================================================
-# ABA — AVALIAÇÃO INDIVIDUAL COMPLETA
+# Avaliação individual
 # ======================================================================
-with aba_av:
+with aba_avaliacao:
     # Quem pode ser avaliado: respeita o filtro de função da barra lateral
     # (mas ignora o de profissionais, para não restringir a escolha).
     base_sel = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
@@ -502,11 +489,9 @@ with aba_av:
             "Profissional avaliado", sorted(base_sel["profissional"].unique()),
             key="av_prof")
 
-        # COM QUEM ele é comparado: sempre a própria função, independente do
-        # filtro da barra lateral. Misturar CD e TSB desloca o percentil em
-        # dezenas de pontos (um técnico tem 0 atendimento/dia por definição
-        # do processo de trabalho, não por desempenho) e o semáforo muda de
-        # cor num relatório que vai para a mão do profissional.
+        # a comparação é sempre com a própria função, qualquer que seja o
+        # filtro: a técnica tem zero atendimento/dia por definição do
+        # processo de trabalho, e misturar as funções distorceria o percentil
         funcao_av = (base_sel.loc[base_sel["profissional"] == prof_av, "funcao"]
                      .mode().iat[0])
         base_cmp = ind[(ind["competencia"] >= ini) & (ind["competencia"] <= fim)
@@ -536,7 +521,7 @@ with aba_av:
             f"({fmt_comp(ini)} a {fmt_comp(fim)}) · "
             f"comparado com {n_profs} {rotulo_pares} da rede")
 
-        # ---------- tabela-síntese com percentil ----------
+        # tabela-síntese com percentil
         por_prof = base_cmp.groupby("profissional")[inds_disp].mean()
         linhas_av = []
         percentis_radar = {}
@@ -545,10 +530,8 @@ with aba_av:
             if prof_av not in serie.index or len(serie) < 2:
                 continue
             valor = serie[prof_av]
-            # rank(pct=True) devolve (0, 1]: o melhor recebe 100. Para
-            # inverter um indicador em que menor é melhor, ranqueia-se o
-            # valor negativo — assim o melhor também chega a 100, em vez do
-            # 100 - 100/n que a subtração direta produzia.
+            # rank(pct=True) vai de 1/n a 1; ranquear o valor negativo mantém
+            # o melhor em 100 também quando menor é melhor
             base_rank = -serie if k in MENOR_MELHOR else serie
             pct_ajust = float(base_rank.rank(pct=True)[prof_av] * 100)
             pct = float(serie.rank(pct=True)[prof_av] * 100)
@@ -574,7 +557,7 @@ with aba_av:
             })
         st.dataframe(pd.DataFrame(linhas_av), use_container_width=True,
                      hide_index=True)
-        st.caption("↓ = indicador em que valor MENOR é melhor (absenteísmo, "
+        st.caption("↓ = indicador em que o valor menor é o melhor (absenteísmo, "
                    "faltas/dia, % exodontias); a coluna Situação já considera "
                    "isso. Percentil calculado sobre a média de cada "
                    "profissional no período.")
@@ -595,7 +578,7 @@ with aba_av:
 
         col_radar, col_destaques = st.columns([1, 1])
 
-        # ---------- radar de posição relativa ----------
+        # radar de posição relativa
         with col_radar:
             if len(percentis_radar) >= 3:
                 rotulos = [INDICADORES_ROTULOS[k][:28] for k in percentis_radar]
@@ -619,7 +602,7 @@ with aba_av:
             else:
                 st.info("Selecione ao menos 3 indicadores para o radar.")
 
-        # ---------- destaques automáticos ----------
+        # destaques automáticos
         with col_destaques:
             st.markdown("##### Destaques do período")
             for t in fortes_txt:
@@ -629,7 +612,7 @@ with aba_av:
             st.caption("Percentil ajustado: 100 = melhor posição da rede, "
                        "já considerando a direção de cada indicador.")
 
-        # ---------- evolução mensal com banda da rede ----------
+        # evolução mensal com banda da rede
         st.markdown("##### Evolução mensal × rede "
                     + ("(média ± 1 DP)" if usa_media else "(mediana + IIQ)"))
         series_pdf = []
@@ -681,7 +664,7 @@ with aba_av:
                 "menor_melhor": k in MENOR_MELHOR,
             })
 
-        # ---------- relatório em PDF ----------
+        # relatório em PDF
         st.divider()
         params_pdf = (prof_av, ini, fim, tuple(inds_sel), medida, funcao_av)
         col_b1, col_b2 = st.columns([1, 2])
@@ -714,9 +697,9 @@ with aba_av:
                 mime="application/pdf", key="av_pdf_dl")
 
 # ======================================================================
-# ABA 3 — COMPARATIVO
+# Comparativo
 # ======================================================================
-with aba3:
+with aba_comparativo:
     indicador = st.selectbox(
         "Indicador para comparação",
         list(INDICADORES_ROTULOS.keys()),
@@ -754,8 +737,7 @@ with aba3:
                    "razao_tc", "media_prev_dia", "pct_exodontias", "razao_rest_exo"]
     mat = f.groupby("profissional")[cols_matriz].mean()
     mat_norm = (mat - mat.min()) / (mat.max() - mat.min())
-    # verde sempre significa "melhor": nos indicadores em que menor é
-    # melhor, a escala é invertida (sem isso, absenteísmo alto saía verde)
+    # verde = melhor; inverte a escala onde menor é melhor
     for c in cols_matriz:
         if c in MENOR_MELHOR:
             mat_norm[c] = 1 - mat_norm[c]
@@ -771,9 +753,9 @@ with aba3:
                "brutos estão na aba Dados.")
 
 # ======================================================================
-# ABA 4 — INDICADORES CLÍNICOS
+# Indicadores clínicos
 # ======================================================================
-with aba4:
+with aba_clinicos:
     st.subheader("Perfil clínico-assistencial")
 
     col_a, col_b = st.columns(2)
@@ -836,20 +818,20 @@ with aba4:
         st.plotly_chart(fig, use_container_width=True)
 
 # ======================================================================
-# ABA — PRODUÇÃO CONSOLIDADA DA REDE
+# Produção da rede
 # ======================================================================
-with aba_prod:
+with aba_producao:
     st.subheader("Produção consolidada da rede no período")
     st.caption(f"Período: {fmt_comp(ini)} a {fmt_comp(fim)} · rede completa "
                "(este módulo ignora os filtros de função e profissional). "
                "Consultas/agenda (sem código SIGTAP), preventivos e "
-               "curativos são totalizados SEPARADAMENTE — nunca somados.")
+               "curativos são totalizados **separadamente**, nunca somados.")
 
     base_rede = producao_da_rede(ini, fim)
     grupos_presentes = [g for g in ORDEM_GRUPOS
                         if g in set(base_rede["grupo"])]
 
-    # ---------- KPIs por grupo principal ----------
+    # KPIs por grupo principal
     def _total(grupo=None, chaves=None):
         m = base_rede["grupo"] == grupo if grupo else \
             base_rede["chave"].isin(chaves)
@@ -860,19 +842,19 @@ with aba_prod:
                                           "consulta_manutencao"])
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Consultas realizadas (agenda)",
-              f"{consultas_realizadas:,}".replace(",", "."))
+              inteiro(consultas_realizadas))
     c2.metric("Atendimentos SIGTAP",
-              f"{_total('Atendimentos e consultas (SIGTAP)'):,}".replace(",", "."))
+              inteiro(_total('Atendimentos e consultas (SIGTAP)')))
     c3.metric("Preventivos",
-              f"{_total('Preventivos e ações coletivas'):,}".replace(",", "."))
+              inteiro(_total('Preventivos e ações coletivas')))
     c4.metric("Curativos",
-              f"{_total('Curativos e reabilitadores'):,}".replace(",", "."))
+              inteiro(_total('Curativos e reabilitadores')))
     c5.metric("Cirúrgicos",
-              f"{_total('Cirúrgicos'):,}".replace(",", "."))
+              inteiro(_total('Cirúrgicos')))
     c6.metric("Diagnósticos",
-              f"{_total('Diagnósticos (radiografias, biópsias)'):,}".replace(",", "."))
+              inteiro(_total('Diagnósticos (radiografias, biópsias)')))
 
-    # ---------- evolução mensal por grupo (empilhado) ----------
+    # evolução mensal por grupo (empilhado)
     serie_g = (base_rede.groupby(["competencia", "grupo"])["quantidade"]
                .sum().unstack(fill_value=0)
                .reindex(columns=grupos_presentes, fill_value=0)
@@ -887,7 +869,7 @@ with aba_prod:
                       margin=dict(t=50, b=10))
     st.plotly_chart(fig, use_container_width=True)
 
-    # ---------- tabela detalhada: todos os itens da planilha ----------
+    # tabela detalhada: todos os itens da planilha
     st.markdown("##### Detalhamento por item da planilha (tudo o que foi registrado)")
     detalhe = (base_rede.groupby(["grupo", "codigo_sigtap", "procedimento"],
                                  dropna=False)["quantidade"]
@@ -903,7 +885,7 @@ with aba_prod:
     st.dataframe(detalhe, use_container_width=True, height=420,
                  hide_index=True)
 
-    # ---------- exportações ----------
+    # exportações
     col_e1, col_e2, col_e3 = st.columns([1, 1, 2])
     col_e1.download_button(
         "⬇️ Baixar detalhamento (CSV)",
@@ -943,9 +925,9 @@ with aba_prod:
             mime="application/pdf", key="prod_pdf_dl")
 
 # ======================================================================
-# ABA 5 — DADOS & EXPORTAÇÃO
+# Dados e exportação
 # ======================================================================
-with aba5:
+with aba_dados:
     st.subheader("Matriz de indicadores (profissional × competência)")
     st.dataframe(f.sort_values(["competencia", "profissional"]),
                  use_container_width=True, height=420)
@@ -986,8 +968,6 @@ with aba5:
                                accept_multiple_files=True)
 
     if uploads:
-        import tempfile
-
         resultados = []
         for up in uploads:
             sufixo = Path(up.name).suffix.lower()
@@ -1008,9 +988,8 @@ with aba5:
                 caminho_tmp.unlink(missing_ok=True)
 
             for r in rs:
-                # nome do profissional: fallback = nome do arquivo enviado
-                # (os parsers usam o nome do arquivo TEMPORÁRIO como último
-                # recurso — 'tmpXXXX' — que aqui trocamos pelo nome real)
+                # sem nome na planilha, o parser usa o nome do arquivo
+                # temporário ('tmpXXXX'); troca-se pelo nome do enviado
                 if (not r.profissional.strip(" :.-")
                         or r.profissional.lower().startswith("tmp")):
                     r.profissional = Path(up.name).stem.strip().title()

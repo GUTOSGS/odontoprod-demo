@@ -1,4 +1,4 @@
-r"""OdontoProd — verificação local (o "CI" desta esteira).
+r"""verificação local (o "CI" desta esteira).
 
 Este projeto não tem (nem pode ter) repositório remoto: a base tem nomes
 reais. Então o papel do CI é feito aqui, na máquina, antes do commit.

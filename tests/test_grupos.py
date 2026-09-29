@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """Testes do classificador de grupos de produção (src/indicadores/grupos.py).
 
 Regra central defendida no TCC: consultas/agenda, preventivos e curativos
-NUNCA são somados juntos. Estes testes travam essa regra.
+nunca são somados juntos. Estes testes travam essa regra.
 """
 import pandas as pd
 import pytest

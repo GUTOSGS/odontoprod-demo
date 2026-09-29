@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes das metas de 2026 (src/indicadores/metas.py): faixas ministeriais
 nas fronteiras exatas das notas e agregação por soma de numeradores e
 denominadores."""
@@ -31,8 +30,6 @@ def test_faixas_nas_fronteiras_das_notas(codigo, valor, esperado):
 
 def test_passos_do_velocimetro_cobrem_o_eixo_sem_buraco():
     for m in metas.MINISTERIAIS:
-        if not m["calculavel"]:
-            continue
         passos = m["passos"]
         assert passos[0][0] == 0 and passos[-1][1] == m["eixo"]
         for (_, fim, _), (ini, _, _) in zip(passos, passos[1:]):
@@ -60,21 +57,21 @@ def _prod(itens):
 def test_agrega_somando_numeradores_e_denominadores():
     v = metas.calcular(_ind(), _prod([]))
     assert v["B2"] == 45.0            # 9 ÷ 20, não média de 90% e 0%
-    assert v["O5"] == 2.0             # 40 urgências ÷ 20 dias
-    assert v["O6"] == 40.0            # 40 ÷ 100 atendimentos
+    assert v["O4"] == 2.0             # 40 urgências ÷ 20 dias
+    assert v["O5"] == 40.0            # 40 ÷ 100 atendimentos
 
 
 def test_agenda_so_conta_competencias_com_agendados():
     """B não registra agendados: seus 5 faltosos não inflam o percentual."""
     v = metas.calcular(_ind(), _prod([]))
     assert v["O1"] == 8.0             # 80 ÷ 10 dias de A
-    assert v["O3"] == 10.0            # 8 ÷ 80
+    assert v["O2"] == 10.0            # 8 ÷ 80
 
 
 def test_denominador_zero_e_nao_calculavel():
     v = metas.calcular(_ind(primeiras_consultas=[0, 0],
                             agendados=[0, 0]), _prod([]))
-    assert v["B2"] is None and v["O1"] is None and v["O3"] is None
+    assert v["B2"] is None and v["O1"] is None and v["O2"] is None
     assert v["B3"] is None and v["B6"] is None
 
 
@@ -99,23 +96,22 @@ def _op(codigo):
 
 @pytest.mark.parametrize("codigo,valor,esperado", [
     ("O1", 8, True), ("O1", 7.9, False),
-    ("O3", 10, True), ("O3", 10.1, False),
+    ("O2", 10, True), ("O2", 10.1, False),
     ("O1", None, None),
 ])
 def test_atingiu_respeita_o_sentido_da_meta(codigo, valor, esperado):
     assert metas.atingiu(valor, _op(codigo)) is esperado
 
 
-# ---------------------------------------------------------- faixas das
-# metas operacionais: a meta é a fronteira do Ótimo e abaixo dela vêm três
-# degraus de um terço da meta (pactuado em 23/09/2026)
+# metas operacionais: a meta é a fronteira do Ótimo e, abaixo dela, três
+# degraus de um terço da meta
 @pytest.mark.parametrize("codigo,valor,esperado", [
     # "quanto mais, melhor": meta 8 -> degraus de 2,67
     ("O1", 9.0, OTIMO), ("O1", 8.0, OTIMO), ("O1", 7.9, BOM),
     ("O1", 5.34, BOM), ("O1", 5.33, SUFICIENTE), ("O1", 2.6, REGULAR),
     # "quanto menos, melhor": meta 10% -> degraus de 3,33
-    ("O3", 9.9, OTIMO), ("O3", 10.0, OTIMO), ("O3", 10.1, BOM),
-    ("O3", 13.3, BOM), ("O3", 15.0, SUFICIENTE), ("O3", 17.0, REGULAR),
+    ("O2", 9.9, OTIMO), ("O2", 10.0, OTIMO), ("O2", 10.1, BOM),
+    ("O2", 13.3, BOM), ("O2", 15.0, SUFICIENTE), ("O2", 17.0, REGULAR),
 ])
 def test_faixa_operacional_equidistante(codigo, valor, esperado):
     assert metas.faixa_operacional(valor, _op(codigo)) == esperado
@@ -141,7 +137,7 @@ def test_texto_das_faixas_sai_na_ordem_do_melhor_para_o_pior():
     assert (metas.texto_faixas(_op("O1"))
             == "Ótimo: ≥ 8 · Bom: ≥ 5,33 · Suficiente: ≥ 2,67 "
                "· Regular: < 2,67")
-    assert (metas.texto_faixas(_op("O3"))
+    assert (metas.texto_faixas(_op("O2"))
             == "Ótimo: ≤ 10% · Bom: ≤ 13,33% · Suficiente: ≤ 16,67% "
                "· Regular: > 16,67%")
 
@@ -156,7 +152,7 @@ def test_indicadores_de_dentista_nao_aparecem_para_a_tecnica():
                     metas.aplicaveis(metas.OPERACIONAIS, ["tecnico"])]
 
     assert ministeriais == ["B4", "B5"]
-    assert operacionais == ["O1", "O3", "O4"]
+    assert operacionais == ["O1", "O2", "O3"]
 
 
 def test_recorte_com_as_duas_funcoes_mostra_tudo():

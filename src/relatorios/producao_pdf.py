@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-OdontoProd — Relatório PDF de Produção Consolidada da Rede.
+"""Relatório PDF de Produção Consolidada da Rede.
 
 Página 1: síntese por grupo (consultas, preventivos, curativos...) e
 gráfico de barras empilhadas por competência. Páginas seguintes: tabela

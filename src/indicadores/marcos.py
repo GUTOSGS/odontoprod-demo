@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """Marcos da série histórica, desenhados nos gráficos de evolução.
 
-Painel acionável liga a variação no tempo ao que pode explicá-la (Stahlman
-et al., 2025). Aqui ficam as competências em que algo externo à produção
-mudou — o instrumento de registro, uma regra de contagem — e que por isso
-podem explicar um degrau no gráfico.
+São competências em que algo externo à produção mudou (o instrumento de
+registro, uma regra de contagem) e que por isso podem explicar um degrau
+na série.
 """
 
 # A transição de template foi medida no relatório de cobertura do lote: em

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Testes do motor de indicadores (src/indicadores/motor.py).
 
 Os valores esperados são conferíveis à mão a partir da fixture
