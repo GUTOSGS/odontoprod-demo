@@ -39,7 +39,7 @@ def gerar_hash(senha: str, iteracoes: int = ITERACOES) -> str:
 
 
 def _confere_legado(senha: str, guardado: str) -> bool:
-    """SHA-256 com salt global — formato antigo, mantido por compatibilidade."""
+    """SHA-256 com salt global: formato antigo, mantido por compatibilidade."""
     try:
         salt = st.secrets["auth"]["salt"]
     except Exception:
@@ -80,7 +80,7 @@ def exigir_login() -> dict:
         return st.session_state["sessao"]
 
     st.markdown("## 🦷 OdontoProd")
-    st.caption("Painel de Produtividade em Saúde Bucal — APS municipal "
+    st.caption("Painel de Produtividade em Saúde Bucal · APS municipal "
                "(demonstração com dados anonimizados)")
 
     with st.form("login"):

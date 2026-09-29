@@ -1,5 +1,5 @@
 """Painel de Produtividade em Saúde Bucal (APS)
-TCC MBA Data Science & Analytics — USP/Esalq
+TCC do MBA em Data Science & Analytics (USP/Esalq)
 
 Executar:  streamlit run app.py
 """
@@ -26,7 +26,7 @@ from src.ingestao.parser_ods import parse_arquivo
 DADOS = Path(__file__).parent / "dados"
 
 st.set_page_config(
-    page_title="OdontoProd — Saúde Bucal APS",
+    page_title="OdontoProd · Saúde Bucal APS",
     page_icon="🦷",
     layout="wide",
 )
@@ -102,7 +102,7 @@ def kpi_fmt(v, casas=1, sufixo=""):
 # Barra lateral: filtros globais
 # ======================================================================
 st.sidebar.title("🦷 OdontoProd")
-st.sidebar.caption("Demonstração pública — **dados anonimizados** · TCC MBA DSA USP/Esalq")
+st.sidebar.caption("Demonstração pública com **dados anonimizados** · TCC MBA DSA USP/Esalq")
 
 modo_periodo = st.sidebar.radio("Período", ["Intervalo", "Mês único"],
                                 horizontal=True, label_visibility="collapsed")
@@ -150,7 +150,7 @@ barra_usuario()
 if f.empty:
     st.warning("⚠️ Nenhum registro para a combinação de filtros selecionada. "
                "Verifique o período, a função (CD/técnico) e os profissionais "
-               "escolhidos — por exemplo, um dentista não aparece quando o "
+               "escolhidos. Por exemplo, um dentista não aparece quando o "
                "filtro de função está em 'Técnico', e vice-versa.")
     st.stop()
 
@@ -212,7 +212,7 @@ with aba_visao:
                                text=marco["rotulo"], showarrow=False,
                                xanchor="left", yanchor="bottom",
                                font=dict(size=11, color="#555555"))
-        fig.update_layout(title="Evolução mensal — médias da rede",
+        fig.update_layout(title="Evolução mensal das médias da rede",
                           height=380, legend=dict(orientation="h", y=-0.25),
                           margin=dict(t=50, b=10))
         st.plotly_chart(fig, use_container_width=True)
@@ -229,7 +229,7 @@ with aba_visao:
 
     # a cor responde só se há planilha no mês; comparar valores fica com o
     # boxplot do Comparativo, porque posição se lê melhor que tom de cor
-    st.markdown("##### Envio de planilhas — profissional × competência")
+    st.markdown("##### Envio de planilhas por profissional e competência")
     presenca = (f.assign(enviou=1)
                 .pivot_table(index="profissional", columns="competencia",
                              values="enviou", aggfunc="max", fill_value=0))
@@ -294,7 +294,7 @@ def _selo(faixa):
 
 
 with aba_metas:
-    st.subheader("Metas 2026 — indicadores ministeriais e operacionais")
+    st.subheader("Metas 2026: indicadores ministeriais e operacionais")
     st.caption(
         "Fonte das metas: resumo municipal de indicadores de saúde bucal "
         "para o planejamento 2026 (coordenação). Os valores respeitam os filtros "
@@ -319,7 +319,7 @@ with aba_metas:
     populacao = kpi_fmt(metas.POPULACAO_POR_DENTISTA, 0)   # 3.500
     st.caption(
         f"São **aproximações** a partir das planilhas locais, por "
-        f"profissional — o valor oficial é apurado no SIAPS por equipe "
+        f"profissional; o valor oficial é apurado no SIAPS por equipe "
         f"(INE), com os códigos elegíveis de cada nota. B1 usa a população "
         f"de referência de {populacao} pessoas por cirurgião-dentista, "
         f"pactuada pela coordenação, e B4 as "
@@ -351,8 +351,8 @@ with aba_metas:
     st.caption(
         "A meta municipal é a fronteira do **Ótimo**; abaixo dela vêm três "
         "degraus de mesmo tamanho (um terço da meta), no formato das faixas "
-        "do Ministério. O sentido de cada meta — quanto mais, melhor ou "
-        "quanto menos, melhor — é o declarado no documento. A linha preta "
+        "do Ministério. O sentido de cada meta (quanto mais, melhor ou "
+        "quanto menos, melhor) é o declarado no documento. A linha preta "
         "marca a meta; o número pequeno é a diferença em relação a ela.")
     operacionais = metas.aplicaveis(metas.OPERACIONAIS, funcoes)
     colunas = st.columns(3)
@@ -400,7 +400,7 @@ with aba_metas:
                 for v in tab[spec["codigo"]]]
         st.dataframe(exibe, hide_index=True, use_container_width=True)
         st.caption("Faixa de cada meta operacional: " + " | ".join(
-            f"**{s['nome']}** — {metas.texto_faixas(s)}"
+            f"**{s['nome']}**: {metas.texto_faixas(s)}"
             for s in operacionais))
 
     with st.expander("Como cada valor é calculado"):
@@ -409,7 +409,7 @@ with aba_metas:
             st.markdown(f"- {nome}: {spec['formula']}")
         st.markdown(
             "- Agendamentos e faltas usam só as competências em que o "
-            "profissional registrou agendados — quem não preenche o campo "
+            "profissional registrou agendados; quem não preenche o campo "
             "não puxa a média da rede para baixo.\n"
             "- Preventivos coletivos (flúor gel, bochecho, escovação "
             "supervisionada) ficam fora de B3 e B5, que tratam de "
@@ -551,7 +551,7 @@ with aba_avaliacao:
                 "Média rede": round(serie.mean(), 2),
                 "DP": round(serie.std(), 2),
                 "Mediana": round(serie.median(), 2),
-                "IIQ (P25–P75)": f"{q1:.2f} – {q3:.2f}",
+                "IIQ (P25 a P75)": f"{q1:.2f} a {q3:.2f}",
                 "Percentil": f"{pct:.0f}º",
                 "Situação": situacao,
             })
@@ -566,14 +566,14 @@ with aba_avaliacao:
         tabela_pdf = [{
             "Indicador": linha["Indicador"], "valor": str(linha[prof_av]),
             "media": str(linha["Média rede"]), "dp": str(linha["DP"]),
-            "mediana": str(linha["Mediana"]), "iiq": linha["IIQ (P25–P75)"],
+            "mediana": str(linha["Mediana"]), "iiq": linha["IIQ (P25 a P75)"],
             "percentil": linha["Percentil"],
             "situacao": linha["Situação"].split(" ", 1)[1],
         } for linha in linhas_av]
         ordenado = sorted(percentis_radar.items(), key=lambda x: x[1])
-        fortes_txt = [f"{INDICADORES_ROTULOS[k]} — percentil ajustado {v:.0f}"
+        fortes_txt = [f"{INDICADORES_ROTULOS[k]}: percentil ajustado {v:.0f}"
                       for k, v in reversed(ordenado[-3:])]
-        fracos_txt = [f"{INDICADORES_ROTULOS[k]} — percentil ajustado {v:.0f}"
+        fracos_txt = [f"{INDICADORES_ROTULOS[k]}: percentil ajustado {v:.0f}"
                       for k, v in ordenado[:3] if v < 50]
 
         col_radar, col_destaques = st.columns([1, 1])
@@ -713,7 +713,7 @@ with aba_comparativo:
         med = (f.groupby("profissional")[indicador].mean()
                .sort_values(ascending=True).reset_index())
         fig = px.bar(med, x=indicador, y="profissional", orientation="h",
-                     title=f"Ranking — {rot} (média no período)",
+                     title=f"Ranking: {rot} (média no período)",
                      color_discrete_sequence=[AZUL])
         fig.update_layout(height=max(400, 22 * len(med)),
                           xaxis_title=None, yaxis_title=None,
@@ -724,7 +724,7 @@ with aba_comparativo:
         ordem = med.sort_values(indicador, ascending=False)["profissional"]
         fig = px.box(f, x=indicador, y="profissional",
                      category_orders={"profissional": list(ordem)},
-                     title=f"Distribuição mensal — {rot}",
+                     title=f"Distribuição mensal: {rot}",
                      color_discrete_sequence=["#2e8b6e"])
         fig.update_layout(height=max(400, 22 * len(med)),
                           xaxis_title=None, yaxis_title=None,
@@ -743,7 +743,7 @@ with aba_comparativo:
             mat_norm[c] = 1 - mat_norm[c]
     mat_norm.columns = [INDICADORES_ROTULOS[c] for c in cols_matriz]
     fig = px.imshow(mat_norm.T, aspect="auto", color_continuous_scale="RdYlGn",
-                    zmin=0, zmax=1, labels=dict(color="0–1"))
+                    zmin=0, zmax=1, labels=dict(color="0 a 1"))
     fig.update_layout(height=340, xaxis_title=None, yaxis_title=None,
                       margin=dict(t=10, b=10))
     st.plotly_chart(fig, use_container_width=True)
@@ -864,7 +864,7 @@ with aba_producao:
         fig.add_bar(x=[fmt_comp(c) for c in serie_g.index],
                     y=serie_g[g], name=g)
     fig.update_layout(barmode="stack", height=420,
-                      title="Produção mensal por grupo — totalizações separadas",
+                      title="Produção mensal por grupo (totalizações separadas)",
                       legend=dict(orientation="h", y=-0.35),
                       margin=dict(t=50, b=10))
     st.plotly_chart(fig, use_container_width=True)
@@ -953,7 +953,7 @@ with aba_dados:
     st.subheader("📤 Enviar planilhas de produção")
     st.caption("Modo calculadora (demonstração): aceita os dois templates "
                "(2022-2024 e Mapa 2025+), .ods ou .xlsx. Os arquivos são "
-               "processados apenas nesta sessão e descartados — nada é "
+               "processados apenas nesta sessão e descartados; nada é "
                "armazenado. Envie planilhas de teste ou anonimizadas.")
 
     col_u1, col_u2 = st.columns(2)
@@ -982,7 +982,7 @@ with aba_dados:
                 else:
                     rs = [parse_arquivo(caminho_tmp)]
             except Exception as e:
-                st.error(f"{up.name}: falha ao abrir — {type(e).__name__}: {e}")
+                st.error(f"{up.name}: falha ao abrir ({type(e).__name__}: {e})")
                 continue
             finally:
                 caminho_tmp.unlink(missing_ok=True)
@@ -1040,8 +1040,8 @@ with aba_dados:
 
     st.divider()
     st.caption(
-        "OdontoProd — TCC MBA em Data Science & Analytics (USP/Esalq). "
-        "Demonstração com dados anonimizados. Fonte: planilhas mensais de produção (2022–2026), "
+        "OdontoProd, TCC do MBA em Data Science & Analytics (USP/Esalq). "
+        "Demonstração com dados anonimizados. Fonte: planilhas mensais de produção (2022 a 2026), "
         "processadas por pipeline auditável. Indicadores calculados a partir "
         "dos lançamentos diários; totais sempre recalculados."
     )

@@ -2,7 +2,7 @@
 (Mapa de Produção 2025+, src/ingestao/parser_mapa_v2.py).
 
 Regra do projeto: no v2 o campo MÊS/ANO é texto livre e frequentemente
-errado — o nome da aba prevalece, com checagem de plausibilidade do ano.
+errado: o nome da aba prevalece, com checagem de plausibilidade do ano.
 """
 import pytest
 

@@ -1,7 +1,7 @@
 """Testes do parser do template v1 (src/ingestao/parser_ods.py).
 
 Princípio do projeto que estes testes travam: o parser tolera planilha
-imperfeita, mas nunca falha em silêncio — toda decisão automática vira aviso.
+imperfeita, mas nunca falha em silêncio: toda decisão automática vira aviso.
 """
 import pandas as pd
 import pytest

@@ -145,7 +145,7 @@ def test_texto_das_faixas_sai_na_ordem_do_melhor_para_o_pior():
 # ------------------------------------------------- aplicação por função
 def test_indicadores_de_dentista_nao_aparecem_para_a_tecnica():
     """A TSB não faz exodontia, restauração, tratamento concluído nem
-    urgência — medir isso nela só produziria zero."""
+    urgência; medir isso nela só produziria zero."""
     ministeriais = [s["codigo"] for s in
                     metas.aplicaveis(metas.MINISTERIAIS, ["tecnico"])]
     operacionais = [s["codigo"] for s in

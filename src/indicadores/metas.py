@@ -158,8 +158,8 @@ OPERACIONAIS = [
     {"codigo": "O6", "nome": "Consultas por tratamento completado",
      "meta": 5, "sentido": "teto", "unidade": "", "casas": 1,
      "funcoes": (CD,),
-     "formula": "(atendimentos − urgências) ÷ tratamentos completados — "
-                "aproximação: a planilha não identifica o episódio"},
+     "formula": "(atendimentos − urgências) ÷ tratamentos completados "
+                "(aproximação: a planilha não identifica o episódio)"},
 ]
 
 # a meta é a fronteira do Ótimo; abaixo dela, três degraus de um terço da

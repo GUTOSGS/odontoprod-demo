@@ -58,7 +58,7 @@ def test_dias_trabalhados_ignora_linhas_de_agenda():
 ])
 def test_divisor_zero_devolve_none_e_nao_explode(indicador):
     """Sem agendados, sem 1ª consulta, sem exodontia ou sem dia trabalhado
-    o indicador é ausente — nunca 0 nem exceção."""
+    o indicador é ausente, nunca 0 nem exceção."""
     vazio = pd.DataFrame([
         lancamento(categoria="agenda", codigo_sigtap=None, chave="agendados",
                    quantidade=0),

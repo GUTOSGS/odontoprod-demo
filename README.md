@@ -1,4 +1,4 @@
-# OdontoProd — Demonstração
+# OdontoProd: demonstração
 
 Painel de monitoramento da produção em saúde bucal na Atenção Primária à
 Saúde (APS), desenvolvido como produto do TCC do MBA em Data Science &
@@ -17,7 +17,7 @@ senha de demonstração)
 ## O problema
 
 Na saúde bucal municipal, a produção é registrada em planilhas mensais
-preenchidas por cada cirurgião-dentista e técnico em saúde bucal — com
+preenchidas por cada cirurgião-dentista e técnico em saúde bucal, com
 linhas removidas, cabeçalhos digitados com erro, fórmulas de total
 quebradas, cópias duplicadas e duas gerações de modelo no mesmo acervo.
 O OdontoProd transforma esse acervo em base analítica auditável e em
@@ -50,26 +50,26 @@ painel web (app.py, Streamlit + Plotly) e relatórios em PDF
 
 Princípio central: **nenhuma decisão automática é silenciosa**. Correções,
 descartes e inferências viram aviso no relatório de qualidade, e os totais
-são sempre recalculados dos lançamentos diários — nunca copiados da coluna
+são sempre recalculados dos lançamentos diários, nunca copiados da coluna
 de total da planilha.
 
 ## Módulos do painel
 
-1. **Visão Geral** — indicadores-síntese, evolução mensal, comparação entre
-   unidades e mapa de calor profissional × competência
-2. **Metas 2026** — velocímetros dos seis indicadores ministeriais (B1 a B6)
+1. **Visão Geral**: indicadores-síntese, evolução mensal, comparação entre
+   unidades e matriz de envio de planilhas por profissional e competência
+2. **Metas 2026**: velocímetros dos seis indicadores ministeriais (B1 a B6)
    e das metas operacionais municipais, com faixas Ótimo / Bom / Suficiente /
    Regular; recorte da rede ou de um profissional
-3. **Produtividade Individual** — evolução de cada indicador contra a rede
-4. **Avaliação Individual** — percentil ajustado à direção de cada indicador,
+3. **Produtividade Individual**: evolução de cada indicador contra a rede
+4. **Avaliação Individual**: percentil ajustado à direção de cada indicador,
    radar de posição relativa, destaques automáticos e **relatório de
    devolutiva em PDF**, sempre comparando com pares da mesma função
-5. **Comparativo** — rankings, boxplots e matriz indicador × profissional
-6. **Indicadores Clínicos** — tratamento completado, restaurações ×
+5. **Comparativo**: rankings, boxplots e matriz indicador × profissional
+6. **Indicadores Clínicos**: tratamento completado, restaurações ×
    exodontias × ART
-7. **Produção da Rede** — produção por grupo de procedimentos, sem somar
+7. **Produção da Rede**: produção por grupo de procedimentos, sem somar
    consultas, preventivos e curativos na mesma contagem
-8. **Dados & Exportação** — tabela analítica e download
+8. **Dados & Exportação**: tabela analítica e download
 
 ![Metas 2026](docs/tela_metas_2026.jpg)
 
@@ -80,7 +80,7 @@ de total da planilha.
 - **Ministeriais (B1 a B6):** faixas das notas metodológicas do Ministério
   da Saúde (maio/2026). B1 e B4 usam população de referência pactuada
   localmente (3.500 pessoas por cirurgião-dentista; 18% delas com 6 a 12
-  anos). São aproximações a partir das planilhas — o valor oficial é
+  anos). São aproximações a partir das planilhas; o valor oficial é
   apurado no SIAPS por equipe.
 - **Operacionais:** a meta municipal é a fronteira do Ótimo; abaixo dela,
   três degraus de um terço da meta produzem Bom, Suficiente e Regular.
@@ -117,7 +117,7 @@ python -m pytest             # só os testes
 
 O teste de anonimização (`tests/test_anonimizacao.py`) falha se algum
 identificador real, ou algum arquivo do ambiente local com dado nominal,
-chegar a este repositório — é a guarda que mantém a demonstração publicável.
+chegar a este repositório. É a guarda que mantém a demonstração publicável.
 
 ## Estrutura
 

@@ -1,5 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
-"""Guarda da anonimização — o teste mais importante deste repositório.
+"""Guarda da anonimização: o teste mais importante deste repositório.
 
 Esta é a versão pública de demonstração do OdontoProd. A base operacional,
 com nomes reais de profissionais e unidades, roda apenas em ambiente local do
@@ -63,7 +63,7 @@ def test_toda_unidade_tem_rotulo_sintetico(producao):
 
 def test_nenhuma_coluna_carrega_o_nome_original(producao, indicadores):
     """A coluna `profissional_original` existe na base local e guarda a
-    grafia real da planilha — ela não pode ter vindo junto."""
+    grafia real da planilha; ela não pode ter vindo junto."""
     for base in (producao, indicadores):
         assert "profissional_original" not in base.columns
 

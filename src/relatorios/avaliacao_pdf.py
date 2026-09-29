@@ -26,7 +26,7 @@ A4 = (8.27, 11.69)
 
 def _rodape(fig, pagina):
     fig.text(0.5, 0.02,
-             f"OdontoProd — Relatório de Avaliação Individual · página {pagina}",
+             f"OdontoProd · Relatório de Avaliação Individual · página {pagina}",
              ha="center", fontsize=7, color=CINZA)
 
 
@@ -48,7 +48,7 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
         fig = plt.figure(figsize=A4)
         fig.text(0.08, 0.955, "Avaliação Individual de Desempenho",
                  fontsize=17, fontweight="bold", color=AZUL)
-        fig.text(0.08, 0.928, "OdontoProd — Produtividade em Saúde Bucal (APS)",
+        fig.text(0.08, 0.928, "OdontoProd · Produtividade em Saúde Bucal (APS)",
                  fontsize=10, color=CINZA)
         fig.text(0.08, 0.885, profissional, fontsize=14, fontweight="bold")
         papel = ("Cirurgião-dentista" if funcao == "dentista"
@@ -68,7 +68,7 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
 
         if tabela_linhas:
             cab = ["Indicador", "Profis-\nsional", "Média\nrede", "DP",
-                   "Mediana", "IIQ\n(P25–P75)", "Per-\ncentil", "Situação"]
+                   "Mediana", "IIQ\n(P25-P75)", "Per-\ncentil", "Situação"]
             celulas = [[ln["Indicador"], ln["valor"], ln["media"], ln["dp"],
                         ln["mediana"], ln["iiq"], ln["percentil"],
                         ln["situacao"]]
@@ -134,13 +134,13 @@ def gerar_pdf_avaliacao(*, profissional: str, funcao: str, unidade: str,
         y = 0.34
         fig.text(0.08, y, "Pontos fortes", fontsize=11, fontweight="bold",
                  color=VERDE)
-        for t in fortes or ["— (sem destaques no recorte)"]:
+        for t in fortes or ["(sem destaques no recorte)"]:
             y -= 0.025
             fig.text(0.10, y, "• " + t, fontsize=9)
         y -= 0.04
         fig.text(0.08, y, "Oportunidades de melhoria", fontsize=11,
                  fontweight="bold", color=VERMELHO)
-        for t in fracos or ["— (nenhum indicador abaixo do P50)"]:
+        for t in fracos or ["(nenhum indicador abaixo do P50)"]:
             y -= 0.025
             fig.text(0.10, y, "• " + t, fontsize=9)
         _rodape(fig, 2)

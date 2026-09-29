@@ -45,7 +45,7 @@ def _sem_acento(txt: str) -> str:
 
 
 def unidade_plausivel(texto: str) -> tuple[bool, str]:
-    """Diz se o texto extraído pode ser nome de unidade — e, se não, por quê.
+    """Diz se o texto extraído pode ser nome de unidade e, se não, por quê.
 
     O campo de unidade fica ao lado do campo de mês no cabeçalho da
     planilha, e às vezes recebe o conteúdo errado: a base já carregava uma
@@ -152,7 +152,7 @@ def _reparar_dias(mapa: dict, avisos: list) -> dict:
             certo = dias[k - 1] + 1
             avisos.append(
                 f"Dia fora de sequência no cabeçalho: {dias[k]} entre "
-                f"{dias[k-1]} e {dias[k+1]} — corrigido para {certo}"
+                f"{dias[k-1]} e {dias[k+1]}; corrigido para {certo}"
             )
             dias[k] = certo
     # o que ainda estiver fora de ordem é descartado com aviso
@@ -163,7 +163,7 @@ def _reparar_dias(mapa: dict, avisos: list) -> dict:
             mapa_ok[j] = d
             ultimo = d
         else:
-            avisos.append(f"Dia {d} fora de ordem no cabeçalho — coluna ignorada")
+            avisos.append(f"Dia {d} fora de ordem no cabeçalho; coluna ignorada")
     return mapa_ok
 
 
@@ -171,8 +171,8 @@ def _linha_dias(df: pd.DataFrame, avisos: list) -> tuple[int | None, dict]:
     """Encontra a linha de cabeçalho dos dias e mapeia coluna -> dia.
 
     Estratégia em duas passadas:
-    1. Âncora: linha cujo rótulo contém 'PRODUCAO' (ex.: PRODUÇÃO ODONTOLOGIA)
-       — aceita qualquer quantidade de dias (profissionais chegam a deixar
+    1. Âncora: linha cujo rótulo contém 'PRODUCAO' (ex.: PRODUÇÃO ODONTOLOGIA).
+       Aceita qualquer quantidade de dias (profissionais chegam a deixar
        só os dias trabalhados).
     2. Fallback: qualquer linha com >= 15 valores crescentes entre 1 e 31.
     """
@@ -227,7 +227,7 @@ def parse_arquivo(caminho: str | Path) -> ResultadoParse:
     res.profissional = res.profissional.title()
     if mes_pasta and res.mes and mes_pasta != res.mes:
         res.avisos.append(
-            f"Mês do arquivo ({res.mes}) difere da pasta ({mes_pasta}) — "
+            f"Mês do arquivo ({res.mes}) difere da pasta ({mes_pasta}); "
             f"usando o da pasta"
         )
         res.mes = mes_pasta

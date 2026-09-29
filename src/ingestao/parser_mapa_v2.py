@@ -254,7 +254,7 @@ def parse_arquivo_v2(caminho: str | Path) -> list[ResultadoParse]:
         # costumam manter o cabeçalho MÊS/ANO desatualizado)
         if mes_aba and res.mes != mes_aba:
             res.avisos.append(f"MÊS/ANO interno ({res.mes:02d}) difere do "
-                              f"nome da aba ({aba!r}) — usando o da aba")
+                              f"nome da aba ({aba!r}); usando o da aba")
             res.mes = mes_aba
         if ano_aba:
             res.ano = ano_aba
@@ -268,7 +268,7 @@ def parse_arquivo_v2(caminho: str | Path) -> list[ResultadoParse]:
         elif mes_aba == 0 and mes_pasta and res.mes != mes_pasta:
             res.avisos.append(
                 f"Competência do arquivo ({res.mes:02d}/{res.ano or '?'}) "
-                f"difere da pasta ({mes_pasta:02d}/{ano_pasta or '?'}) — "
+                f"difere da pasta ({mes_pasta:02d}/{ano_pasta or '?'}); "
                 f"usando a da pasta")
             res.mes = mes_pasta
             if ano_pasta:
@@ -277,7 +277,7 @@ def parse_arquivo_v2(caminho: str | Path) -> list[ResultadoParse]:
             res.ano = ano_pasta
         # plausibilidade temporal: template v2 existe desde 2025
         if res.ano and not (2022 <= res.ano <= 2035):
-            res.avisos.append(f"Ano implausível no arquivo ({res.ano}) — "
+            res.avisos.append(f"Ano implausível no arquivo ({res.ano}); "
                               f"usando o da pasta ({ano_pasta})")
             res.ano = ano_pasta
         if not res.profissional.strip(" :.-"):
@@ -328,7 +328,7 @@ def resolver_conflitos_abas(resultados: list) -> list:
 
     Regra:
       1. a aba nomeada vale para o mês que o nome dela declara;
-      2. a genérica só fica com o mês se não houver aba nomeada para ele —
+      2. a genérica só fica com o mês se não houver aba nomeada para ele,
          exceto quando a aba nomeada está quase vazia (< 25% da genérica),
          sinal de que o profissional abriu a aba do mês e não a preencheu;
       3. conteúdo idêntico não é conflito: a cópia sai sem aviso;
@@ -363,7 +363,7 @@ def resolver_conflitos_abas(resultados: list) -> list:
         if t_nom < PROPORCAO_QUASE_VAZIA * t_gen:
             descartadas.add(id(rival))
             aviso = (f"{PREFIXO_CONFLITO} em {comp}: aba do mês "
-                     f"'{_nome_aba(rival)}' quase vazia ({t_nom:g}) — mantida a "
+                     f"'{_nome_aba(rival)}' quase vazia ({t_nom:g}); mantida a "
                      f"aba genérica '{aba}' ({t_gen:g})")
         else:
             descartadas.add(id(r))

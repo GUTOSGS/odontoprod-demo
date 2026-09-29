@@ -23,7 +23,7 @@ CORES_GRUPOS = ["#1f3864", "#2e5f8a", "#2e7d5b", "#8c6d1f",
 
 def _rodape(fig, pagina):
     fig.text(0.5, 0.02,
-             f"OdontoProd — Produção Consolidada da Rede · página {pagina}",
+             f"OdontoProd · Produção Consolidada da Rede · página {pagina}",
              ha="center", fontsize=7, color=CINZA)
 
 
@@ -42,7 +42,7 @@ def gerar_pdf_producao(*, periodo_txt: str, n_profissionais: int,
         fig = plt.figure(figsize=A4)
         fig.text(0.08, 0.955, "Produção Consolidada da Rede",
                  fontsize=17, fontweight="bold", color=AZUL)
-        fig.text(0.08, 0.930, "OdontoProd — Produtividade em Saúde Bucal (APS)",
+        fig.text(0.08, 0.930, "OdontoProd · Produtividade em Saúde Bucal (APS)",
                  fontsize=10, color=CINZA)
         fig.text(0.08, 0.898, f"Período: {periodo_txt} · "
                  f"{n_profissionais} profissionais",

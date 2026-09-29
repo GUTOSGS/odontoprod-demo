@@ -1,7 +1,7 @@
 """Testes da verificação de senha (src/auth.py).
 
 Não testam a tela de login (isso é Streamlit): testam a regra que decide se
-uma senha confere — a parte que, se estiver errada, deixa o painel aberto.
+uma senha confere: a parte que, se estiver errada, deixa o painel aberto.
 """
 import hashlib
 
@@ -29,7 +29,7 @@ def test_senha_errada_nao_confere(tentativa):
 
 
 def test_cada_hash_tem_salt_proprio():
-    """Dois usuários com a mesma senha não podem ter o mesmo hash — senão o
+    """Dois usuários com a mesma senha não podem ter o mesmo hash; senão o
     arquivo denuncia quem repetiu senha."""
     a, b = gerar_hash("mesma senha"), gerar_hash("mesma senha")
     assert a != b
